@@ -43,3 +43,8 @@ export function getUserDetail() {
 export function updateUserInfo(data) {
   return post("/user/update", data);
 }
+
+// 修改密码
+export function changePassword(data) {
+  return post("/user/change-password", data);
+}

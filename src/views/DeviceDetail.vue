@@ -276,9 +276,9 @@
           <el-select v-model="editForm.type" placeholder="请选择设备类型">
             <el-option
               v-for="type in deviceTypes"
-              :key="type.value"
-              :label="type.label"
-              :value="type.value"
+              :key="type.id"
+              :label="type.name"
+              :value="type.id"
             />
           </el-select>
         </el-form-item>
@@ -318,7 +318,15 @@ import {
   Cpu,
   Cloudy,
   VideoCamera,
+  Lightning,
+  SetUp,
 } from "@element-plus/icons-vue";
+import {
+  getDeviceDetail,
+  toggleDevice as toggleDeviceApi,
+  updateDeviceProperty,
+  getDeviceTypes,
+} from "@/api/device";
 
 const router = useRouter();
 const route = useRoute();
@@ -326,27 +334,21 @@ const deviceId = computed(() => route.params.deviceId);
 const activeTab = ref("info");
 
 // 设备类型定义
-const deviceTypes = [
-  { label: "灯光", value: "light" },
-  { label: "电视", value: "tv" },
-  { label: "空调", value: "ac" },
-  { label: "冰箱", value: "fridge" },
-  { label: "摄像头", value: "camera" },
-  { label: "其他", value: "other" },
-];
+const deviceTypes = ref([]);
 
 // 设备信息
 const device = reactive({
   id: deviceId.value,
-  name: "客厅灯",
-  type: "light",
-  online: true,
-  status: true,
-  ip: "192.168.1.100",
-  mac: "AA:BB:CC:DD:EE:FF",
-  firmware: "v1.2.3",
-  addTime: new Date("2023-05-15"),
-  lastActive: new Date(),
+  name: "",
+  type: "",
+  online: false,
+  status: false,
+  ip: "",
+  mac: "",
+  firmware: "",
+  addTime: null,
+  lastActive: null,
+  properties: {},
 });
 
 // 灯光控制
@@ -399,10 +401,12 @@ const formatDate = (date) => {
 // 根据设备类型获取图标
 const getDeviceIcon = (type) => {
   const iconMap = {
+    light: Lightning,
     tv: Monitor,
     ac: Cloudy,
     fridge: Refrigerator,
     camera: VideoCamera,
+    other: SetUp,
     default: Cpu,
   };
   return iconMap[type] || iconMap.default;
@@ -410,38 +414,81 @@ const getDeviceIcon = (type) => {
 
 // 获取设备类型名称
 const getDeviceTypeName = (type) => {
-  const found = deviceTypes.find((item) => item.value === type);
-  return found ? found.label : "其他";
+  const found = deviceTypes.value.find((item) => item.id === type);
+  return found ? found.name : "其他";
 };
 
 // 切换设备状态
-const toggleDevice = () => {
-  device.status = !device.status;
-  updateDeviceStatus();
+const toggleDevice = async () => {
+  try {
+    const res = await toggleDeviceApi(device.id);
+    if (res.status === 200) {
+      ElMessage.success(
+        res.message || `设备已${res.result.device.status ? "开启" : "关闭"}`
+      );
+      // 更新设备状态
+      device.status = res.result.device.status;
+    } else {
+      ElMessage.error(res.message || "操作失败");
+    }
+  } catch (error) {
+    console.error("切换设备状态失败:", error);
+    ElMessage.error("操作失败，请稍后再试");
+  }
 };
 
 // 更新设备状态
 const updateDeviceStatus = () => {
-  // 模拟API调用
-  ElMessage.success(`${device.name}已${device.status ? "开启" : "关闭"}`);
+  toggleDevice();
 };
 
 // 灯光控制 - 更新亮度
-const updateBrightness = (value) => {
-  // 模拟API调用
-  ElMessage.success(`${device.name}亮度已设置为${value}%`);
+const updateBrightness = async (value) => {
+  try {
+    const res = await updateDeviceProperty(device.id, "brightness", value);
+    if (res.status === 200) {
+      ElMessage.success(`${device.name}亮度已设置为${value}%`);
+    } else {
+      ElMessage.error(res.message || "更新失败");
+    }
+  } catch (error) {
+    console.error("更新设备属性失败:", error);
+    ElMessage.error("操作失败，请稍后再试");
+  }
 };
 
 // 灯光控制 - 更新色温
-const updateTemperature = (value) => {
-  // 模拟API调用
-  ElMessage.success(`${device.name}色温已设置为${value}%`);
+const updateTemperature = async (value) => {
+  try {
+    const res = await updateDeviceProperty(
+      device.id,
+      "colorTemperature",
+      value
+    );
+    if (res.status === 200) {
+      ElMessage.success(`${device.name}色温已设置为${value}%`);
+    } else {
+      ElMessage.error(res.message || "更新失败");
+    }
+  } catch (error) {
+    console.error("更新设备属性失败:", error);
+    ElMessage.error("操作失败，请稍后再试");
+  }
 };
 
 // 灯光控制 - 更新颜色
-const updateColor = (value) => {
-  // 模拟API调用
-  ElMessage.success(`${device.name}颜色已更新`);
+const updateColor = async (value) => {
+  try {
+    const res = await updateDeviceProperty(device.id, "color", value);
+    if (res.status === 200) {
+      ElMessage.success(`${device.name}颜色已更新`);
+    } else {
+      ElMessage.error(res.message || "更新失败");
+    }
+  } catch (error) {
+    console.error("更新设备属性失败:", error);
+    ElMessage.error("操作失败，请稍后再试");
+  }
 };
 
 // 空调控制 - 更新温度
@@ -546,11 +593,52 @@ const updateDeviceInfo = async () => {
   }
 };
 
+// 加载设备类型列表
+const loadDeviceTypes = async () => {
+  try {
+    const res = await getDeviceTypes();
+    if (res.status === 200 && res.result.types) {
+      deviceTypes.value = res.result.types;
+    }
+  } catch (error) {
+    console.error("加载设备类型失败:", error);
+  }
+};
+
+// 加载设备详情
+const loadDeviceDetail = async () => {
+  try {
+    const res = await getDeviceDetail(deviceId.value);
+    if (res.status === 200 && res.result.device) {
+      const deviceData = res.result.device;
+      Object.assign(device, deviceData);
+
+      // 初始化控制界面相关的状态
+      if (device.type === "light" && device.properties) {
+        lightBrightness.value = device.properties.brightness || 80;
+        lightTemperature.value = device.properties.colorTemperature || 50;
+        lightColor.value = device.properties.color || "#FFFFFF";
+      } else if (device.type === "ac" && device.properties) {
+        acTemperature.value = device.properties.temperature || 24;
+        acMode.value = device.properties.mode || "cool";
+        acFanSpeed.value = device.properties.fanSpeed || "auto";
+      } else if (device.type === "tv" && device.properties) {
+        tvVolume.value = device.properties.volume || 30;
+        tvChannel.value = device.properties.channel || 1;
+        tvSource.value = device.properties.source || "hdmi1";
+      }
+    }
+  } catch (error) {
+    console.error("加载设备详情失败:", error);
+    ElMessage.error("加载设备详情失败，请稍后再试");
+  }
+};
+
 // 页面加载时获取设备信息
 onMounted(() => {
-  // 这里应该获取设备的详细信息
-  // 模拟API调用
-  // 实际上会根据deviceId来获取对应设备的信息
+  // 加载设备类型和设备详情
+  loadDeviceTypes();
+  loadDeviceDetail();
 });
 </script>
 

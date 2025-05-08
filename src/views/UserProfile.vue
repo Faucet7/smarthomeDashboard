@@ -54,9 +54,6 @@
         <el-button type="warning" @click="showPasswordDialog"
           >修改密码</el-button
         >
-        <el-button type="info" @click="testUserDetailApi"
-          >测试用户详情API</el-button
-        >
       </div>
     </el-card>
 
@@ -112,7 +109,11 @@
 <script setup>
 import { ref, reactive, onMounted } from "vue";
 import { ElMessage } from "element-plus";
-import { getUserDetail } from "@/api/user";
+import {
+  getUserDetail,
+  updateUserInfo,
+  changePassword as changePasswordApi,
+} from "@/api/user";
 
 // 用户信息表单
 const profileFormRef = ref(null);
@@ -204,15 +205,25 @@ const saveChanges = async () => {
 
     loading.value = true;
 
-    // 这里应该调用更新用户信息API
-    // 模拟API调用
-    setTimeout(() => {
+    // 调用更新用户信息API
+    const res = await updateUserInfo({
+      name: profileForm.username,
+    });
+
+    if (res.status === 200) {
       ElMessage.success("个人信息更新成功");
       isEditing.value = false;
-      loading.value = false;
-    }, 1000);
+    } else {
+      ElMessage.error(res.message || "更新个人信息失败");
+    }
   } catch (error) {
-    console.error("表单验证失败", error);
+    console.error("更新个人信息失败", error);
+    if (error.response && error.response.data) {
+      ElMessage.error(error.response.data.message || "更新失败");
+    } else {
+      ElMessage.error("更新个人信息失败，请稍后再试");
+    }
+  } finally {
     loading.value = false;
   }
 };
@@ -235,21 +246,55 @@ const changePassword = async () => {
 
     pwdLoading.value = true;
 
-    // 这里应该调用修改密码API
-    // 模拟API调用
-    setTimeout(() => {
+    // 调用修改密码API
+    const res = await changePasswordApi({
+      currentPassword: passwordForm.currentPassword,
+      newPassword: passwordForm.newPassword,
+    });
+
+    if (res.status === 200) {
       ElMessage.success("密码修改成功");
       passwordDialogVisible.value = false;
-      pwdLoading.value = false;
-    }, 1000);
+    } else {
+      ElMessage.error(res.message || "密码修改失败");
+    }
   } catch (error) {
-    console.error("表单验证失败", error);
+    console.error("密码修改失败", error);
+    if (error.response && error.response.data) {
+      ElMessage.error(error.response.data.message || "修改失败");
+    } else {
+      ElMessage.error("密码修改失败，请稍后再试");
+    }
+  } finally {
     pwdLoading.value = false;
   }
 };
 
-// 加载用户信息
-const loadUserInfo = () => {
+// 使用API加载用户详情
+const loadUserDetail = async () => {
+  try {
+    const res = await getUserDetail();
+
+    if (res.status === 200 && res.result.user) {
+      const userData = res.result.user;
+
+      // 更新表单数据
+      profileForm.id = userData.id || "";
+      profileForm.username = userData.name || userData.username || "";
+      profileForm.homeId = userData.homeId || "";
+      profileForm.identity = userData.type?.name || "用户";
+    }
+  } catch (error) {
+    console.error("加载用户信息失败:", error);
+    ElMessage.warning("加载用户详情失败，请稍后再试");
+
+    // 如果API调用失败，使用localStorage中的信息作为备选
+    loadUserInfoFromStorage();
+  }
+};
+
+// 从本地存储加载用户信息（作为备选）
+const loadUserInfoFromStorage = () => {
   import("@/utils/auth").then(({ getUserInfo }) => {
     const parsedInfo = getUserInfo();
     if (parsedInfo) {
@@ -262,35 +307,9 @@ const loadUserInfo = () => {
   });
 };
 
-// 测试用户详情API
-const testUserDetailApi = async () => {
-  try {
-    ElMessage.info("正在调用用户详情API，结果将打印到控制台");
-    console.log("正在调用 /user/detail API...");
-    const res = await getUserDetail();
-    console.log("用户详情API返回结果:", res);
-
-    if (res.status === 200 || !res.status) {
-      console.log("用户详情数据:", res.result || res.data || res);
-      ElMessage.success("API调用成功，详情请查看控制台");
-    } else {
-      console.error("获取用户详情失败:", res.message || "未知错误");
-      ElMessage.error("API调用失败，详情请查看控制台");
-    }
-  } catch (error) {
-    console.error("调用用户详情API出错:", error);
-    ElMessage.error("API调用出错，详情请查看控制台");
-
-    if (error.response) {
-      console.error("错误状态码:", error.response.status);
-      console.error("错误数据:", error.response.data);
-    }
-  }
-};
-
 onMounted(() => {
-  // 加载用户信息
-  loadUserInfo();
+  // 使用API加载用户详情
+  loadUserDetail();
 });
 </script>
 
@@ -327,7 +346,8 @@ onMounted(() => {
 }
 
 .profile-form {
-  max-width: 500px;
+  /* max-width: 500px; */
+  padding-right: 80px;
 }
 
 .action-buttons {

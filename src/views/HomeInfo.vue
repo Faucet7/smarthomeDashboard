@@ -60,7 +60,7 @@
                 <el-icon size="30"><User /></el-icon>
               </div>
               <div class="stat-details">
-                <div class="stat-value">1</div>
+                <div class="stat-value">{{ membersCount }}</div>
                 <div class="stat-label">用户数量</div>
               </div>
             </div>
@@ -70,7 +70,7 @@
                 <el-icon size="30"><Monitor /></el-icon>
               </div>
               <div class="stat-details">
-                <div class="stat-value">{{ deviceCount }}</div>
+                <div class="stat-value">{{ deviceStats.total }}</div>
                 <div class="stat-label">设备数量</div>
               </div>
             </div>
@@ -90,6 +90,47 @@
         </el-card>
       </el-col>
     </el-row>
+
+    <!-- 家庭成员列表 -->
+    <el-card class="members-card" shadow="hover">
+      <template #header>
+        <div class="card-header">
+          <span
+            ><el-icon class="header-icon"><UserFilled /></el-icon>家庭成员</span
+          >
+        </div>
+      </template>
+
+      <el-table
+        :data="members"
+        stripe
+        style="width: 100%"
+        v-loading="membersLoading"
+      >
+        <el-table-column prop="name" label="姓名" />
+        <el-table-column prop="username" label="用户名" />
+        <el-table-column label="角色">
+          <template #default="scope">
+            <el-tag
+              :type="
+                scope.row.type.id === 1
+                  ? 'danger'
+                  : scope.row.type.id === 3
+                  ? 'info'
+                  : 'success'
+              "
+            >
+              {{ scope.row.type.name }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="最后登录时间">
+          <template #default="scope">
+            {{ formatDateTime(scope.row.lastLoginTime) }}
+          </template>
+        </el-table-column>
+      </el-table>
+    </el-card>
   </div>
 </template>
 
@@ -103,18 +144,32 @@ import {
   House,
   Edit,
   DataAnalysis,
+  UserFilled,
 } from "@element-plus/icons-vue";
+import { getUserInfo } from "@/utils/auth";
+import { getHomeInfo, getHomeMembers, updateHomeInfo } from "@/api/home";
+import { getDeviceStats } from "@/api/device";
 
 // 家庭信息表单
 const homeFormRef = ref(null);
 const homeForm = reactive({
   id: "",
-  name: "我的智能家",
-  createdAt: new Date("2023-01-15"),
+  name: "",
+  createdAt: "",
+  updatedAt: "",
 });
 
-// 设备数量
-const deviceCount = ref(8);
+// 设备统计
+const deviceStats = reactive({
+  total: 0,
+  online: 0,
+  offline: 0,
+});
+
+// 家庭成员
+const members = ref([]);
+const membersCount = ref(0);
+const membersLoading = ref(false);
 
 // 编辑状态管理
 const isEditing = ref(false);
@@ -129,7 +184,7 @@ const rules = {
   ],
 };
 
-// 格式化日期
+// 格式化日期（只显示年月日）
 const formatDate = (date) => {
   if (!date) return "N/A";
 
@@ -141,14 +196,66 @@ const formatDate = (date) => {
   return `${year}-${month}-${day}`;
 };
 
+// 格式化日期时间（显示年月日时分）
+const formatDateTime = (dateTime) => {
+  if (!dateTime) return "N/A";
+
+  const d = new Date(dateTime);
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  const hours = String(d.getHours()).padStart(2, "0");
+  const minutes = String(d.getMinutes()).padStart(2, "0");
+
+  return `${year}-${month}-${day} ${hours}:${minutes}`;
+};
+
 // 加载家庭信息
-const loadHomeInfo = () => {
-  import("@/utils/auth").then(({ getUserInfo }) => {
-    const parsedInfo = getUserInfo();
-    if (parsedInfo) {
-      homeForm.id = parsedInfo.homeId || "";
+const loadHomeInfo = async () => {
+  try {
+    const res = await getHomeInfo();
+    if (res.status === 200 && res.result.home) {
+      const home = res.result.home;
+      homeForm.id = home.id;
+      homeForm.name = home.name;
+      homeForm.createdAt = home.createdAt;
+      homeForm.updatedAt = home.updatedAt;
     }
-  });
+  } catch (error) {
+    console.error("加载家庭信息失败:", error);
+    ElMessage.error("加载家庭信息失败，请稍后再试");
+  }
+};
+
+// 加载家庭成员
+const loadHomeMembers = async () => {
+  membersLoading.value = true;
+  try {
+    const res = await getHomeMembers();
+    if (res.status === 200 && res.result.members) {
+      members.value = res.result.members;
+      membersCount.value = res.result.total || members.value.length;
+    }
+  } catch (error) {
+    console.error("加载家庭成员失败:", error);
+    ElMessage.error("加载家庭成员失败，请稍后再试");
+  } finally {
+    membersLoading.value = false;
+  }
+};
+
+// 加载设备统计信息
+const loadDeviceStats = async () => {
+  try {
+    const res = await getDeviceStats();
+    if (res.status === 200 && res.result.stats) {
+      deviceStats.total = res.result.stats.total;
+      deviceStats.online = res.result.stats.online;
+      deviceStats.offline = res.result.stats.offline;
+    }
+  } catch (error) {
+    console.error("加载设备统计信息失败:", error);
+  }
 };
 
 // 开始编辑
@@ -174,15 +281,29 @@ const saveChanges = async () => {
 
     loading.value = true;
 
-    // 这里应该调用更新家庭信息API
-    // 模拟API调用
-    setTimeout(() => {
+    // 调用更新家庭信息API
+    const res = await updateHomeInfo({
+      name: homeForm.name,
+    });
+
+    if (res.status === 200) {
       ElMessage.success("家庭信息更新成功");
+      // 更新表单中的数据
+      if (res.result.home) {
+        homeForm.updatedAt = res.result.home.updatedAt;
+      }
       isEditing.value = false;
-      loading.value = false;
-    }, 1000);
+    } else {
+      ElMessage.error(res.message || "更新家庭信息失败");
+    }
   } catch (error) {
-    console.error("表单验证失败", error);
+    console.error("更新家庭信息失败", error);
+    if (error.response && error.response.data) {
+      ElMessage.error(error.response.data.message || "更新失败");
+    } else {
+      ElMessage.error("更新家庭信息失败，请稍后再试");
+    }
+  } finally {
     loading.value = false;
   }
 };
@@ -191,7 +312,11 @@ onMounted(() => {
   // 加载家庭信息
   loadHomeInfo();
 
-  // 这里可以获取更多家庭详细信息
+  // 加载家庭成员
+  loadHomeMembers();
+
+  // 加载设备统计信息
+  loadDeviceStats();
 });
 </script>
 
@@ -199,12 +324,14 @@ onMounted(() => {
 .home-info {
   max-width: 1200px;
   margin: 0 auto;
+  display: contents;
   width: 100%;
   padding: 0 12px;
 }
 
 .home-card,
-.home-stats {
+.home-stats,
+.members-card {
   margin-bottom: 24px;
   border-radius: 12px;
   height: 100%;
@@ -212,7 +339,8 @@ onMounted(() => {
 }
 
 .home-card:hover,
-.home-stats:hover {
+.home-stats:hover,
+.members-card:hover {
   transform: translateY(-5px);
 }
 

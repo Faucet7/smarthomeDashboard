@@ -28,9 +28,9 @@
         <el-option label="全部" value="" />
         <el-option
           v-for="type in deviceTypes"
-          :key="type.value"
-          :label="type.label"
-          :value="type.value"
+          :key="type.id"
+          :label="type.name"
+          :value="type.id"
         />
       </el-select>
     </div>
@@ -118,9 +118,9 @@
           <el-select v-model="newDeviceForm.type" placeholder="请选择设备类型">
             <el-option
               v-for="type in deviceTypes"
-              :key="type.value"
-              :label="type.label"
-              :value="type.value"
+              :key="type.id"
+              :label="type.name"
+              :value="type.id"
             />
           </el-select>
         </el-form-item>
@@ -157,27 +157,19 @@ import {
   Cpu,
   Cloudy,
   VideoCamera,
+  Lightning,
+  SetUp,
 } from "@element-plus/icons-vue";
+import {
+  getDeviceList,
+  getDeviceTypes,
+  toggleDevice as toggleDeviceApi,
+} from "@/api/device";
 
 const router = useRouter();
 
 // 设备列表
-const devices = ref([
-  { id: "D001", name: "客厅灯", type: "light", online: true, status: true },
-  { id: "D002", name: "卧室灯", type: "light", online: true, status: false },
-  { id: "D003", name: "智能电视", type: "tv", online: true, status: false },
-  { id: "D004", name: "空调", type: "ac", online: true, status: true },
-  { id: "D005", name: "冰箱", type: "fridge", online: true, status: true },
-  {
-    id: "D006",
-    name: "监控摄像头",
-    type: "camera",
-    online: false,
-    status: false,
-  },
-  { id: "D007", name: "书房灯", type: "light", online: true, status: true },
-  { id: "D008", name: "智能门锁", type: "other", online: true, status: true },
-]);
+const devices = ref([]);
 
 // 搜索和过滤
 const searchQuery = ref("");
@@ -185,14 +177,7 @@ const statusFilter = ref("");
 const typeFilter = ref("");
 
 // 设备类型
-const deviceTypes = [
-  { label: "灯光", value: "light" },
-  { label: "电视", value: "tv" },
-  { label: "空调", value: "ac" },
-  { label: "冰箱", value: "fridge" },
-  { label: "摄像头", value: "camera" },
-  { label: "其他", value: "other" },
-];
+const deviceTypes = ref([]);
 
 // 添加设备对话框
 const addDeviceDialogVisible = ref(false);
@@ -241,10 +226,12 @@ const filteredDevices = computed(() => {
 // 根据设备类型获取图标
 const getDeviceIcon = (type) => {
   const iconMap = {
+    light: Lightning,
     tv: Monitor,
     ac: Cloudy,
     fridge: Refrigerator,
     camera: VideoCamera,
+    other: SetUp,
     default: Cpu,
   };
   return iconMap[type] || iconMap.default;
@@ -252,14 +239,28 @@ const getDeviceIcon = (type) => {
 
 // 获取设备类型名称
 const getDeviceTypeName = (type) => {
-  const found = deviceTypes.find((item) => item.value === type);
-  return found ? found.label : "其他";
+  const found = deviceTypes.value.find((item) => item.id === type);
+  return found ? found.name : "其他";
 };
 
 // 切换设备状态
-const toggleDevice = (device) => {
-  device.status = !device.status;
-  ElMessage.success(`${device.name}已${device.status ? "开启" : "关闭"}`);
+const toggleDevice = async (device) => {
+  try {
+    const res = await toggleDeviceApi(device.id);
+    if (res.status === 200) {
+      ElMessage.success(
+        res.message ||
+          `${device.name}已${res.result.device.status ? "开启" : "关闭"}`
+      );
+      // 更新设备状态
+      device.status = res.result.device.status;
+    } else {
+      ElMessage.error(res.message || "操作失败");
+    }
+  } catch (error) {
+    console.error("切换设备状态失败:", error);
+    ElMessage.error("操作失败，请稍后再试");
+  }
 };
 
 // 跳转到设备详情
@@ -308,8 +309,34 @@ const addDevice = async () => {
   }
 };
 
+// 加载设备类型列表
+const loadDeviceTypes = async () => {
+  try {
+    const res = await getDeviceTypes();
+    if (res.status === 200 && res.result.types) {
+      deviceTypes.value = res.result.types;
+    }
+  } catch (error) {
+    console.error("加载设备类型失败:", error);
+  }
+};
+
+// 加载设备列表
+const loadDevices = async () => {
+  try {
+    const res = await getDeviceList();
+    if (res.status === 200 && res.result.devices) {
+      devices.value = res.result.devices;
+    }
+  } catch (error) {
+    console.error("加载设备列表失败:", error);
+  }
+};
+
 onMounted(() => {
-  // 这里可以获取设备列表数据
+  // 加载设备类型和设备列表
+  loadDeviceTypes();
+  loadDevices();
 });
 </script>
 

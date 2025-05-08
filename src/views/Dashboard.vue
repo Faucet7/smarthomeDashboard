@@ -245,6 +245,12 @@ import {
 import { ElMessage, ElMessageBox } from "element-plus";
 import { getUserInfo, clearAuth } from "@/utils/auth";
 import { getUserDetail } from "@/api/user";
+import {
+  getDeviceStats,
+  getDeviceList,
+  toggleDevice as toggleDeviceApi,
+} from "@/api/device";
+import { getHomeInfo } from "@/api/home";
 
 // 路由实例
 const router = useRouter();
@@ -313,24 +319,19 @@ const userData = reactive({
 const homeData = reactive({
   id: "",
   name: "我的智能家",
+  createdAt: "",
+  updatedAt: "",
 });
 
 // 设备统计
 const deviceStats = reactive({
-  total: 8,
-  online: 6,
-  offline: 2,
+  total: 0,
+  online: 0,
+  offline: 0,
 });
 
-// 常用设备列表
-const frequentDevices = ref([
-  { id: 1, name: "客厅灯", type: "light", online: true, power: true },
-  { id: 2, name: "卧室灯", type: "light", online: true, power: false },
-  { id: 3, name: "智能电视", type: "tv", online: true, power: false },
-  { id: 4, name: "空调", type: "ac", online: true, power: true },
-  { id: 5, name: "冰箱", type: "fridge", online: true, power: true },
-  { id: 6, name: "监控摄像头", type: "camera", online: false, power: false },
-]);
+// 常用设备列表 - 默认为空，通过API获取数据
+const frequentDevices = ref([]);
 
 // 根据时间获取问候语
 const getGreeting = () => {
@@ -361,9 +362,22 @@ const getDeviceIcon = (type) => {
 };
 
 // 切换设备状态
-const toggleDevice = (device) => {
-  // 模拟API调用
-  ElMessage.success(`${device.name}已${device.power ? "开启" : "关闭"}`);
+const toggleDevice = async (device) => {
+  try {
+    const res = await toggleDeviceApi(device.id);
+    if (res.status === 200) {
+      ElMessage.success(
+        res.message || `${device.name}已${device.status ? "开启" : "关闭"}`
+      );
+      // 更新设备状态
+      device.status = res.result.device.status;
+    } else {
+      ElMessage.error(res.message || "操作失败");
+    }
+  } catch (error) {
+    console.error("切换设备状态失败:", error);
+    ElMessage.error("操作失败，请稍后再试");
+  }
 };
 
 // 导航到设备详情页
@@ -401,6 +415,63 @@ const loadUserInfo = () => {
 
     // 更新家庭信息
     homeData.id = parsedInfo.homeId || "";
+
+    // 加载家庭详细信息
+    loadHomeInfo();
+  }
+};
+
+// 加载家庭信息
+const loadHomeInfo = async () => {
+  try {
+    const res = await getHomeInfo();
+    if (res.status === 200 && res.result.home) {
+      homeData.name = res.result.home.name;
+      homeData.id = res.result.home.id;
+      homeData.createdAt = res.result.home.createdAt;
+      homeData.updatedAt = res.result.home.updatedAt;
+    }
+  } catch (error) {
+    console.error("加载家庭信息失败:", error);
+  }
+};
+
+// 加载设备统计信息
+const loadDeviceStats = async () => {
+  try {
+    const res = await getDeviceStats();
+    if (res.status === 200 && res.result.stats) {
+      deviceStats.total = res.result.stats.total;
+      deviceStats.online = res.result.stats.online;
+      deviceStats.offline = res.result.stats.offline;
+    }
+  } catch (error) {
+    console.error("加载设备统计信息失败:", error);
+  }
+};
+
+// 加载设备列表
+const loadDeviceList = async () => {
+  try {
+    const res = await getDeviceList();
+    if (res.status === 200 && res.result.devices) {
+      // 获取全部设备
+      const devices = res.result.devices;
+      // 过滤出在线设备，并限制为最多6个
+      frequentDevices.value = devices
+        .filter((device) => device.online || devices.length <= 6)
+        .slice(0, 6)
+        .map((device) => ({
+          id: device.id,
+          name: device.name,
+          type: device.type,
+          online: device.online,
+          power: device.status,
+          status: device.status,
+        }));
+    }
+  } catch (error) {
+    console.error("加载设备列表失败:", error);
   }
 };
 
@@ -447,10 +518,12 @@ onMounted(() => {
   // 调用用户详情API
   fetchUserDetail();
 
+  // 加载设备统计和设备列表
+  loadDeviceStats();
+  loadDeviceList();
+
   // 监听窗口大小变化，自动调整侧边栏状态
   window.addEventListener("resize", resizeHandler);
-
-  // 这里可以获取更多的家庭数据和设备数据
 });
 
 onUnmounted(() => {

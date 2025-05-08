@@ -1,5 +1,7 @@
 import axios from "axios";
 import { getToken } from "@/utils/auth";
+import router from "@/router";
+import { ElMessage } from "element-plus";
 
 // 创建axios实例
 const service = axios.create({
@@ -14,8 +16,8 @@ service.interceptors.request.use(
     // 使用auth.js中的getToken方法获取token
     const token = getToken();
     if (token) {
-      // 直接使用token，不加Bearer前缀
-      config.headers["Authorization"] = token;
+      // 在请求头中添加token
+      config.headers["x-access-token"] = token;
       // 记录日志用于调试
       console.log("请求携带token:", token);
     }
@@ -34,7 +36,7 @@ service.interceptors.response.use(
     const res = response.data;
 
     // 检查响应格式并输出调试信息
-    console.log("原始API响应:", res);
+    console.log("API响应:", res);
 
     // 根据响应数据中的状态码进行判断
     if (res.status !== undefined && res.status !== 200) {
@@ -62,6 +64,8 @@ service.interceptors.response.use(
       } else if (error.response.status === 401) {
         console.error("未授权，可能是token已过期");
         // 可以在这里处理token过期的情况
+        ElMessage.error("登录已过期，请重新登录");
+        router.push("/login");
       }
     } else if (error.request) {
       // 请求已发出，但没有收到响应

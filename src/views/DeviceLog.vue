@@ -107,10 +107,11 @@ import { ref, computed, onMounted } from "vue";
 import { useRoute } from "vue-router";
 import { ElMessage } from "element-plus";
 import { ArrowLeft, Search, Download } from "@element-plus/icons-vue";
+import { getDeviceDetail, getDeviceLogs } from "@/api/device";
 
 const route = useRoute();
 const deviceId = computed(() => route.params.deviceId);
-const deviceName = ref("设备名称"); // 实际应该从API获取
+const deviceName = ref(""); // 从API获取
 
 // 日志过滤
 const logTypeFilter = ref("");
@@ -130,105 +131,8 @@ const logTypeOptions = [
   { text: "状态变化", value: "status" },
 ];
 
-// 模拟日志数据
-const allLogs = ref([
-  {
-    id: 1,
-    deviceId: deviceId.value,
-    timestamp: new Date("2023-06-15 08:30:15"),
-    type: "info",
-    content: "设备启动",
-    operator: "system",
-  },
-  {
-    id: 2,
-    deviceId: deviceId.value,
-    timestamp: new Date("2023-06-15 10:25:30"),
-    type: "status",
-    content: "设备状态变更: 开启",
-    operator: "张三",
-  },
-  {
-    id: 3,
-    deviceId: deviceId.value,
-    timestamp: new Date("2023-06-15 15:40:22"),
-    type: "status",
-    content: "设备状态变更: 关闭",
-    operator: "张三",
-  },
-  {
-    id: 4,
-    deviceId: deviceId.value,
-    timestamp: new Date("2023-06-16 09:12:05"),
-    type: "warning",
-    content: "设备响应超时",
-    operator: "system",
-  },
-  {
-    id: 5,
-    deviceId: deviceId.value,
-    timestamp: new Date("2023-06-16 09:15:30"),
-    type: "info",
-    content: "设备恢复正常",
-    operator: "system",
-  },
-  {
-    id: 6,
-    deviceId: deviceId.value,
-    timestamp: new Date("2023-06-16 14:20:10"),
-    type: "status",
-    content: "设备状态变更: 开启",
-    operator: "李四",
-  },
-  {
-    id: 7,
-    deviceId: deviceId.value,
-    timestamp: new Date("2023-06-17 18:30:45"),
-    type: "error",
-    content: "设备连接失败",
-    operator: "system",
-  },
-  {
-    id: 8,
-    deviceId: deviceId.value,
-    timestamp: new Date("2023-06-17 19:05:12"),
-    type: "info",
-    content: "设备重新连接成功",
-    operator: "system",
-  },
-  {
-    id: 9,
-    deviceId: deviceId.value,
-    timestamp: new Date("2023-06-18 11:45:33"),
-    type: "status",
-    content: "设备亮度调整: 80%",
-    operator: "张三",
-  },
-  {
-    id: 10,
-    deviceId: deviceId.value,
-    timestamp: new Date("2023-06-18 21:10:15"),
-    type: "status",
-    content: "设备状态变更: 关闭",
-    operator: "system",
-  },
-  {
-    id: 11,
-    deviceId: deviceId.value,
-    timestamp: new Date("2023-06-19 07:30:00"),
-    type: "status",
-    content: "设备状态变更: 开启",
-    operator: "system",
-  },
-  {
-    id: 12,
-    deviceId: deviceId.value,
-    timestamp: new Date("2023-06-19 22:00:00"),
-    type: "status",
-    content: "设备状态变更: 关闭",
-    operator: "system",
-  },
-]);
+// 日志数据
+const allLogs = ref([]);
 
 // 过滤后的日志
 const filteredLogs = computed(() => {
@@ -303,20 +207,53 @@ const filterLogType = (value, row) => {
   return row.type === value;
 };
 
+// 加载设备信息
+const loadDeviceInfo = async () => {
+  try {
+    const res = await getDeviceDetail(deviceId.value);
+    if (res.status === 200 && res.result.device) {
+      deviceName.value = res.result.device.name;
+    }
+  } catch (error) {
+    console.error("加载设备信息失败:", error);
+    ElMessage.error("加载设备信息失败，请稍后再试");
+  }
+};
+
 // 加载日志
-const loadLogs = () => {
+const loadLogs = async () => {
   loading.value = true;
 
-  // 实际项目中应该调用API获取日志
-  // 模拟API调用延迟
-  setTimeout(() => {
-    loading.value = false;
+  try {
+    const filters = {
+      type: logTypeFilter.value,
+      startDate:
+        dateRange.value && dateRange.value.length > 0
+          ? dateRange.value[0]
+          : null,
+      endDate:
+        dateRange.value && dateRange.value.length > 1
+          ? dateRange.value[1]
+          : null,
+    };
 
+    const res = await getDeviceLogs(deviceId.value, filters);
+
+    if (res.status === 200) {
+      allLogs.value = res.result.logs || [];
+      totalLogs.value = res.result.total || allLogs.value.length;
+      ElMessage.success("日志加载成功");
+    } else {
+      ElMessage.error(res.message || "加载日志失败");
+    }
+  } catch (error) {
+    console.error("加载日志失败:", error);
+    ElMessage.error("加载日志失败，请稍后再试");
+  } finally {
+    loading.value = false;
     // 重置到第一页
     currentPage.value = 1;
-
-    ElMessage.success("日志加载成功");
-  }, 500);
+  }
 };
 
 // 导出日志
@@ -338,10 +275,7 @@ const handleCurrentChange = (val) => {
 // 初始化加载
 onMounted(() => {
   // 获取设备信息
-  // 模拟API调用
-  setTimeout(() => {
-    deviceName.value = "客厅灯";
-  }, 300);
+  loadDeviceInfo();
 
   // 加载日志
   loadLogs();

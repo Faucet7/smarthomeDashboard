@@ -5,6 +5,7 @@
 
 // Token相关操作
 const TokenKey = "token";
+const TokenExpireKey = "tokenExpire"; // 存储token过期时间
 
 /**
  * 获取Token
@@ -17,8 +18,12 @@ export function getToken() {
 /**
  * 设置Token
  * @param {string} token 需要存储的token
+ * @param {number} expireIn token过期时间(秒)，默认2小时
  */
-export function setToken(token) {
+export function setToken(token, expireIn = 7200) {
+  // 设置过期时间为当前时间 + expireIn秒
+  const expireTime = new Date().getTime() + expireIn * 1000;
+  localStorage.setItem(TokenExpireKey, expireTime.toString());
   return localStorage.setItem(TokenKey, token);
 }
 
@@ -26,7 +31,19 @@ export function setToken(token) {
  * 移除Token
  */
 export function removeToken() {
+  localStorage.removeItem(TokenExpireKey);
   return localStorage.removeItem(TokenKey);
+}
+
+/**
+ * 检查token是否过期
+ * @returns {boolean} 是否过期
+ */
+export function isTokenExpired() {
+  const expireTime = localStorage.getItem(TokenExpireKey);
+  if (!expireTime) return true;
+
+  return new Date().getTime() > parseInt(expireTime, 10);
 }
 
 // 用户信息相关操作
@@ -69,5 +86,15 @@ export function clearAuth() {
  * @returns {boolean} 是否已认证
  */
 export function isAuthenticated() {
-  return !!getToken();
+  const hasToken = !!getToken();
+  if (!hasToken) return false;
+
+  // 检查token是否过期
+  if (isTokenExpired()) {
+    // 如果过期了，清除认证信息
+    clearAuth();
+    return false;
+  }
+
+  return true;
 }
