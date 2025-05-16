@@ -64,8 +64,8 @@ service.interceptors.response.use(
       } else if (error.response.status === 401) {
         console.error("未授权，可能是token已过期");
         // 可以在这里处理token过期的情况
-        ElMessage.error("登录已过期，请重新登录");
-        router.push("/login");
+        // ElMessage.error("登录已过期，请重新登录");
+        // router.push("/login");
       }
     } else if (error.request) {
       // 请求已发出，但没有收到响应

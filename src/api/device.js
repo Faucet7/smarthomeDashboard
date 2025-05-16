@@ -1,8 +1,32 @@
 import { get, post } from "@/utils/request";
 
 // 获取设备列表
-export function getDeviceList() {
-  return get("/device/list");
+export function getDeviceList(params) {
+  const defaultParams = {
+    pageIndex: 0,
+    pageSize: 12,
+    sorts: [{ name: "createTime", order: "desc" }],
+    terms: [],
+  };
+  return post("/device/instance/_query", params || defaultParams);
+}
+
+// 部署设备（启用）
+export function deployDevice(productId) {
+  // return request({
+  //   url: `/device/product/${productId}/deploy`,
+  //   method: "post",
+  // });
+  return post(`/device/instance/${productId}/deploy`);
+}
+
+// 取消部署设备（禁用）
+export function undeployDevice(productId) {
+  // return request({
+  //   url: `/device/product/${productId}/undeploy`,
+  //   method: "post",
+  // });
+  return post(`/device/instance/${productId}/undeploy`);
 }
 
 // 获取设备统计信息
@@ -12,7 +36,7 @@ export function getDeviceStats() {
 
 // 获取设备详情
 export function getDeviceDetail(deviceId) {
-  return get(`/device/detail/${deviceId}`);
+  return get(`/device/instance/${deviceId}`);
 }
 
 // 获取设备日志

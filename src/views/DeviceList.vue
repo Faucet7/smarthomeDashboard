@@ -16,8 +16,8 @@
         class="status-filter"
       >
         <el-option label="全部" value="" />
-        <el-option label="在线" value="online" />
-        <el-option label="离线" value="offline" />
+        <el-option label="在线" value="1" />
+        <el-option label="离线" value="0" />
       </el-select>
 
       <el-select
@@ -26,12 +26,9 @@
         class="type-filter"
       >
         <el-option label="全部" value="" />
-        <el-option
-          v-for="type in deviceTypes"
-          :key="type.id"
-          :label="type.name"
-          :value="type.id"
-        />
+        <el-option label="直连设备" value="device" />
+        <el-option label="网关设备" value="gateway" />
+        <el-option label="网关子设备" value="childrenDevice" />
       </el-select>
     </div>
 
@@ -56,25 +53,35 @@
         <el-card
           class="device-card"
           shadow="hover"
-          :class="{ 'device-offline': !device.online }"
+          :class="{ 'device-offline': device.state.value === 'offline' }"
           @click="goToDeviceDetail(device.id)"
         >
           <div class="device-icon">
-            <el-icon size="32px"
-              ><component :is="getDeviceIcon(device.type)"
+            <img
+              v-if="device.photoUrl"
+              :src="device.photoUrl"
+              class="device-photo"
+            />
+            <el-icon v-else size="32px"
+              ><component :is="getDeviceIcon(device.deviceType.value)"
             /></el-icon>
           </div>
           <div class="device-info">
             <h3>{{ device.name }}</h3>
             <p class="device-id">ID: {{ device.id }}</p>
-            <p class="device-type">
-              类型: {{ getDeviceTypeName(device.type) }}
+            <p class="device-type">类型: {{ device.deviceType.text }}</p>
+            <p v-if="device.classifiedName" class="device-classified">
+              分类: {{ device.classifiedName }}
             </p>
             <div
               class="device-status"
-              :class="device.online ? 'status-online' : 'status-offline'"
+              :class="
+                device.state.value === 'online'
+                  ? 'status-online'
+                  : 'status-offline'
+              "
             >
-              {{ device.online ? "在线" : "离线" }}
+              {{ device.state.text }}
             </div>
           </div>
           <div class="device-actions">
@@ -82,16 +89,32 @@
               <el-button
                 size="small"
                 type="primary"
-                :disabled="!device.online"
-                @click.stop="toggleDevice(device)"
+                @click.stop="editDevice(device)"
+                :disabled="device.state.value === 'offline'"
               >
-                {{ device.status ? "关闭" : "开启" }}
+                编辑
               </el-button>
               <el-button
                 size="small"
-                @click.stop="$router.push(`/devices/${device.id}/logs`)"
+                type="info"
+                @click.stop="exportDevice(device)"
               >
-                日志
+                导出
+              </el-button>
+              <el-button
+                size="small"
+                :type="device.state.value === 'online' ? 'warning' : 'success'"
+                :disabled="false"
+                @click.stop="toggleDeviceState(device)"
+              >
+                {{ device.state.value === "online" ? "禁用" : "启用" }}
+              </el-button>
+              <el-button
+                size="small"
+                type="danger"
+                @click.stop="deleteDevice(device)"
+              >
+                删除
               </el-button>
             </el-button-group>
           </div>
@@ -101,6 +124,19 @@
 
     <!-- 没有设备时显示 -->
     <el-empty v-if="filteredDevices.length === 0" description="没有找到设备" />
+
+    <!-- 分页 -->
+    <div class="pagination-container">
+      <el-pagination
+        v-model:current-page="currentPage"
+        v-model:page-size="pageSize"
+        :page-sizes="[12, 24, 36, 48]"
+        layout="total, sizes, prev, pager, next, jumper"
+        :total="total"
+        @size-change="handleSizeChange"
+        @current-change="handleCurrentChange"
+      />
+    </div>
 
     <!-- 添加设备对话框 -->
     <el-dialog v-model="addDeviceDialogVisible" title="添加设备" width="500px">
@@ -114,14 +150,14 @@
           <el-input v-model="newDeviceForm.name" placeholder="请输入设备名称" />
         </el-form-item>
 
-        <el-form-item label="设备类型" prop="type">
-          <el-select v-model="newDeviceForm.type" placeholder="请选择设备类型">
-            <el-option
-              v-for="type in deviceTypes"
-              :key="type.id"
-              :label="type.name"
-              :value="type.id"
-            />
+        <el-form-item label="设备类型" prop="deviceType">
+          <el-select
+            v-model="newDeviceForm.deviceType"
+            placeholder="请选择设备类型"
+          >
+            <el-option label="直连设备" value="device" />
+            <el-option label="网关设备" value="gateway" />
+            <el-option label="网关子设备" value="childrenDevice" />
           </el-select>
         </el-form-item>
 
@@ -148,7 +184,7 @@
 <script setup>
 import { ref, reactive, computed, onMounted } from "vue";
 import { useRouter } from "vue-router";
-import { ElMessage } from "element-plus";
+import { ElMessage, ElMessageBox } from "element-plus";
 import {
   Search,
   Plus,
@@ -162,22 +198,23 @@ import {
 } from "@element-plus/icons-vue";
 import {
   getDeviceList,
-  getDeviceTypes,
   toggleDevice as toggleDeviceApi,
+  deployDevice,
+  undeployDevice,
 } from "@/api/device";
 
 const router = useRouter();
 
 // 设备列表
 const devices = ref([]);
+const total = ref(0);
+const currentPage = ref(1);
+const pageSize = ref(12);
 
 // 搜索和过滤
 const searchQuery = ref("");
 const statusFilter = ref("");
 const typeFilter = ref("");
-
-// 设备类型
-const deviceTypes = ref([]);
 
 // 添加设备对话框
 const addDeviceDialogVisible = ref(false);
@@ -185,7 +222,7 @@ const deviceFormRef = ref(null);
 const addLoading = ref(false);
 const newDeviceForm = reactive({
   name: "",
-  type: "",
+  deviceType: "",
   deviceId: "",
 });
 
@@ -195,7 +232,9 @@ const deviceRules = {
     { required: true, message: "请输入设备名称", trigger: "blur" },
     { min: 2, max: 20, message: "长度在 2 到 20 个字符", trigger: "blur" },
   ],
-  type: [{ required: true, message: "请选择设备类型", trigger: "change" }],
+  deviceType: [
+    { required: true, message: "请选择设备类型", trigger: "change" },
+  ],
   deviceId: [{ required: true, message: "请输入设备ID", trigger: "blur" }],
 };
 
@@ -211,13 +250,15 @@ const filteredDevices = computed(() => {
     const statusMatch =
       statusFilter.value === ""
         ? true
-        : statusFilter.value === "online"
-        ? device.online
-        : !device.online;
+        : statusFilter.value === "1"
+        ? device.state.value === "online"
+        : device.state.value === "offline";
 
     // 类型过滤
     const typeMatch =
-      typeFilter.value === "" ? true : device.type === typeFilter.value;
+      typeFilter.value === ""
+        ? true
+        : device.deviceType.value === typeFilter.value;
 
     return nameMatch && statusMatch && typeMatch;
   });
@@ -226,41 +267,78 @@ const filteredDevices = computed(() => {
 // 根据设备类型获取图标
 const getDeviceIcon = (type) => {
   const iconMap = {
-    light: Lightning,
-    tv: Monitor,
-    ac: Cloudy,
-    fridge: Refrigerator,
-    camera: VideoCamera,
-    other: SetUp,
-    default: Cpu,
+    device: Lightning,
+    gateway: Monitor,
+    childrenDevice: Cpu,
+    default: SetUp,
   };
   return iconMap[type] || iconMap.default;
 };
 
-// 获取设备类型名称
-const getDeviceTypeName = (type) => {
-  const found = deviceTypes.value.find((item) => item.id === type);
-  return found ? found.name : "其他";
-};
-
-// 切换设备状态
-const toggleDevice = async (device) => {
+// 切换设备状态（启用/禁用）
+const toggleDeviceState = async (device) => {
   try {
-    const res = await toggleDeviceApi(device.id);
+    const productId = device.productId || device.id;
+    let res;
+
+    if (device.state.value === "offline") {
+      // 如果当前是禁用状态，调用部署接口启用设备
+      res = await deployDevice(productId);
+    } else {
+      // 如果当前是启用状态，调用取消部署接口禁用设备
+      res = await undeployDevice(productId);
+    }
+
     if (res.status === 200) {
       ElMessage.success(
-        res.message ||
-          `${device.name}已${res.result.device.status ? "开启" : "关闭"}`
+        `${device.state.value === "online" ? "禁用" : "启用"}成功`
       );
-      // 更新设备状态
-      device.status = res.result.device.status;
+      // 重新加载设备列表以获取最新状态
+      loadDevices();
     } else {
       ElMessage.error(res.message || "操作失败");
     }
   } catch (error) {
-    console.error("切换设备状态失败:", error);
-    ElMessage.error("操作失败，请稍后再试");
+    // console.error("操作设备失败:", error);
   }
+};
+
+// 编辑设备
+const editDevice = (device) => {
+  // 编辑设备逻辑，暂时只是导航到详情页
+  router.push(`/devices/${device.id}/edit`);
+};
+
+// 导出设备
+const exportDevice = (device) => {
+  // 导出设备逻辑，暂时实现为消息提示
+  ElMessage.info(`导出设备：${device.name} 功能待实现`);
+};
+
+// 删除设备
+const deleteDevice = (device) => {
+  // 删除设备逻辑，暂时实现为确认对话框
+  ElMessageBox.confirm(
+    `确定要删除设备 "${device.name}" 吗？此操作不可恢复！`,
+    "删除确认",
+    {
+      confirmButtonText: "确定删除",
+      cancelButtonText: "取消",
+      type: "warning",
+    }
+  )
+    .then(() => {
+      ElMessage({
+        type: "success",
+        message: `删除设备：${device.name} 功能待实现`,
+      });
+    })
+    .catch(() => {
+      ElMessage({
+        type: "info",
+        message: "已取消删除",
+      });
+    });
 };
 
 // 跳转到设备详情
@@ -287,21 +365,12 @@ const addDevice = async () => {
 
     // 模拟API调用
     setTimeout(() => {
-      // 创建新设备对象
-      const newDevice = {
-        id: newDeviceForm.deviceId,
-        name: newDeviceForm.name,
-        type: newDeviceForm.type,
-        online: true,
-        status: false,
-      };
-
-      // 添加到列表
-      devices.value.push(newDevice);
-
       ElMessage.success("设备添加成功");
       addDeviceDialogVisible.value = false;
       addLoading.value = false;
+
+      // 重新加载设备列表
+      loadDevices();
     }, 1000);
   } catch (error) {
     console.error("表单验证失败", error);
@@ -309,33 +378,38 @@ const addDevice = async () => {
   }
 };
 
-// 加载设备类型列表
-const loadDeviceTypes = async () => {
-  try {
-    const res = await getDeviceTypes();
-    if (res.status === 200 && res.result.types) {
-      deviceTypes.value = res.result.types;
-    }
-  } catch (error) {
-    console.error("加载设备类型失败:", error);
-  }
+// 处理分页大小变化
+const handleSizeChange = (newSize) => {
+  pageSize.value = newSize;
+  loadDevices();
+};
+
+// 处理页码变化
+const handleCurrentChange = (newPage) => {
+  currentPage.value = newPage;
+  loadDevices();
 };
 
 // 加载设备列表
 const loadDevices = async () => {
   try {
-    const res = await getDeviceList();
-    if (res.status === 200 && res.result.devices) {
-      devices.value = res.result.devices;
+    const res = await getDeviceList({
+      pageIndex: currentPage.value - 1,
+      pageSize: pageSize.value,
+    });
+
+    if (res.status === 200 && res.result) {
+      devices.value = res.result.data;
+      total.value = res.result.total;
     }
   } catch (error) {
     console.error("加载设备列表失败:", error);
+    ElMessage.error("加载设备列表失败，请稍后重试");
   }
 };
 
 onMounted(() => {
-  // 加载设备类型和设备列表
-  loadDeviceTypes();
+  // 加载设备列表
   loadDevices();
 });
 </script>
@@ -373,6 +447,7 @@ onMounted(() => {
   border-radius: 8px;
   cursor: pointer;
   transition: all 0.3s ease;
+  position: relative;
 }
 
 .device-card:hover {
@@ -391,6 +466,13 @@ onMounted(() => {
   color: #409eff;
 }
 
+.device-photo {
+  width: 64px;
+  height: 64px;
+  object-fit: cover;
+  border-radius: 4px;
+}
+
 .device-info {
   text-align: center;
 }
@@ -402,7 +484,8 @@ onMounted(() => {
 }
 
 .device-id,
-.device-type {
+.device-type,
+.device-classified {
   margin: 5px 0;
   font-size: 14px;
   color: #909399;
@@ -430,6 +513,17 @@ onMounted(() => {
   display: flex;
   justify-content: center;
   margin-top: 15px;
+}
+.device-actions .el-button-group {
+  display: flex;
+  position: absolute;
+  bottom: 10px;
+}
+
+.pagination-container {
+  display: flex;
+  justify-content: center;
+  margin-top: 30px;
 }
 
 @media (max-width: 768px) {

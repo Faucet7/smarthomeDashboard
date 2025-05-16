@@ -9,9 +9,11 @@
       <h2 class="device-title">{{ device.name }}</h2>
       <div
         class="device-status"
-        :class="device.online ? 'status-online' : 'status-offline'"
+        :class="
+          device.state.value === 'online' ? 'status-online' : 'status-offline'
+        "
       >
-        {{ device.online ? "在线" : "离线" }}
+        {{ device.state.text }}
       </div>
     </div>
 
@@ -20,18 +22,25 @@
         <el-card class="info-card">
           <div class="device-info-header">
             <div class="device-icon">
-              <el-icon size="60px"
-                ><component :is="getDeviceIcon(device.type)"
+              <img
+                v-if="device.photoUrl"
+                :src="device.photoUrl"
+                class="device-photo"
+              />
+              <el-icon v-else size="60px"
+                ><component :is="getDeviceIcon(device.deviceType?.value)"
               /></el-icon>
             </div>
             <div class="info-actions">
               <el-button-group>
                 <el-button
                   type="primary"
-                  :disabled="!device.online"
+                  :disabled="device.state.value === 'offline'"
                   @click="toggleDevice"
                 >
-                  {{ device.status ? "关闭设备" : "打开设备" }}
+                  {{
+                    device.state.value === "online" ? "控制设备" : "设备离线"
+                  }}
                 </el-button>
                 <el-button @click="$router.push(`/devices/${deviceId}/logs`)"
                   >设备日志</el-button
@@ -56,28 +65,55 @@
               device.name
             }}</el-descriptions-item>
             <el-descriptions-item label="设备类型">{{
-              getDeviceTypeName(device.type)
+              device.deviceType?.text || "未知"
             }}</el-descriptions-item>
             <el-descriptions-item label="设备状态">
-              <el-tag :type="device.status ? 'success' : 'info'">
-                {{ device.status ? "开启" : "关闭" }}
+              <el-tag
+                :type="device.state.value === 'online' ? 'success' : 'info'"
+              >
+                {{ device.state.text }}
               </el-tag>
             </el-descriptions-item>
-            <el-descriptions-item label="IP地址">{{
-              device.ip || "N/A"
-            }}</el-descriptions-item>
-            <el-descriptions-item label="MAC地址">{{
-              device.mac || "N/A"
-            }}</el-descriptions-item>
-            <el-descriptions-item label="固件版本">{{
-              device.firmware || "N/A"
-            }}</el-descriptions-item>
-            <el-descriptions-item label="添加时间">{{
-              formatDate(device.addTime)
-            }}</el-descriptions-item>
-            <el-descriptions-item label="最后活跃" :span="2">{{
-              formatDate(device.lastActive)
-            }}</el-descriptions-item>
+            <el-descriptions-item label="产品ID" v-if="device.productId">
+              {{ device.productId }}
+            </el-descriptions-item>
+            <el-descriptions-item label="产品名称" v-if="device.productName">
+              {{ device.productName }}
+            </el-descriptions-item>
+            <el-descriptions-item label="描述" v-if="device.describe">
+              {{ device.describe }}
+            </el-descriptions-item>
+            <el-descriptions-item label="创建者" v-if="device.creatorName">
+              {{ device.creatorName }}
+            </el-descriptions-item>
+            <el-descriptions-item label="创建时间">
+              {{ formatDate(device.createTime) }}
+            </el-descriptions-item>
+            <el-descriptions-item label="注册时间" v-if="device.registryTime">
+              {{ formatDate(device.registryTime) }}
+            </el-descriptions-item>
+            <el-descriptions-item label="修改者" v-if="device.modifierName">
+              {{ device.modifierName }}
+            </el-descriptions-item>
+            <el-descriptions-item label="修改时间">
+              {{ formatDate(device.modifyTime) }}
+            </el-descriptions-item>
+          </el-descriptions>
+
+          <el-descriptions
+            v-if="device.configuration"
+            title="配置信息"
+            :column="2"
+            border
+            class="device-descriptions"
+          >
+            <el-descriptions-item
+              v-for="(value, key) in device.configuration"
+              :key="key"
+              :label="formatConfigLabel(key)"
+            >
+              {{ value }}
+            </el-descriptions-item>
           </el-descriptions>
         </el-card>
       </el-tab-pane>
@@ -90,21 +126,27 @@
             </div>
           </template>
 
-          <div v-if="device.type === 'light'" class="light-controls">
+          <div
+            v-if="device.state.value === 'offline'"
+            class="device-offline-control"
+          >
+            <el-empty description="设备当前离线，无法控制" />
+          </div>
+
+          <div
+            v-else-if="device.deviceType?.value === 'childrenDevice'"
+            class="light-controls"
+          >
             <div class="control-item">
               <div class="control-label">电源</div>
-              <el-switch
-                v-model="device.status"
-                :disabled="!device.online"
-                @change="updateDeviceStatus"
-              />
+              <el-switch v-model="devicePower" @change="updateDeviceStatus" />
             </div>
 
             <div class="control-item">
               <div class="control-label">亮度</div>
               <el-slider
                 v-model="lightBrightness"
-                :disabled="!device.online || !device.status"
+                :disabled="!devicePower"
                 @change="updateBrightness"
               />
             </div>
@@ -113,139 +155,96 @@
               <div class="control-label">色温</div>
               <el-slider
                 v-model="lightTemperature"
-                :disabled="!device.online || !device.status"
+                :disabled="!devicePower"
                 @change="updateTemperature"
               />
             </div>
+          </div>
+
+          <div
+            v-else-if="device.deviceType?.value === 'gateway'"
+            class="gateway-controls"
+          >
+            <div class="control-item">
+              <div class="control-label">网关状态</div>
+              <el-tag type="success">已连接</el-tag>
+            </div>
 
             <div class="control-item">
-              <div class="control-label">颜色</div>
-              <el-color-picker
-                v-model="lightColor"
-                :disabled="!device.online || !device.status"
-                @change="updateColor"
-                show-alpha
+              <div class="control-label">子设备数量</div>
+              <el-badge
+                :value="childDevicesCount"
+                class="child-devices-count"
               />
+            </div>
+
+            <div class="control-item">
+              <div class="control-label">操作</div>
+              <el-button-group>
+                <el-button @click="refreshGateway">刷新</el-button>
+                <el-button type="primary" @click="scanDevices"
+                  >扫描设备</el-button
+                >
+                <el-button type="warning" @click="restartGateway"
+                  >重启网关</el-button
+                >
+              </el-button-group>
             </div>
           </div>
 
-          <div v-else-if="device.type === 'ac'" class="ac-controls">
+          <div v-else class="device-controls">
             <div class="control-item">
               <div class="control-label">电源</div>
-              <el-switch
-                v-model="device.status"
-                :disabled="!device.online"
-                @change="updateDeviceStatus"
-              />
+              <el-switch v-model="devicePower" @change="updateDeviceStatus" />
             </div>
 
-            <div class="control-item">
-              <div class="control-label">温度</div>
-              <el-input-number
-                v-model="acTemperature"
-                :disabled="!device.online || !device.status"
-                :min="16"
-                :max="30"
-                @change="updateAcTemperature"
-              />
-            </div>
-
-            <div class="control-item">
-              <div class="control-label">模式</div>
-              <el-select
-                v-model="acMode"
-                :disabled="!device.online || !device.status"
-                @change="updateAcMode"
-              >
-                <el-option label="制冷" value="cool" />
-                <el-option label="制热" value="heat" />
-                <el-option label="自动" value="auto" />
-                <el-option label="除湿" value="dry" />
-                <el-option label="送风" value="fan" />
-              </el-select>
-            </div>
-
-            <div class="control-item">
-              <div class="control-label">风速</div>
-              <el-select
-                v-model="acFanSpeed"
-                :disabled="!device.online || !device.status"
-                @change="updateAcFanSpeed"
-              >
-                <el-option label="自动" value="auto" />
-                <el-option label="低速" value="low" />
-                <el-option label="中速" value="medium" />
-                <el-option label="高速" value="high" />
-              </el-select>
-            </div>
-          </div>
-
-          <div v-else-if="device.type === 'tv'" class="tv-controls">
-            <div class="control-item">
-              <div class="control-label">电源</div>
-              <el-switch
-                v-model="device.status"
-                :disabled="!device.online"
-                @change="updateDeviceStatus"
-              />
-            </div>
-
-            <div class="control-item">
-              <div class="control-label">音量</div>
-              <el-slider
-                v-model="tvVolume"
-                :disabled="!device.online || !device.status"
-                :max="100"
-                @change="updateTvVolume"
-              />
-            </div>
-
-            <div class="control-item">
-              <div class="control-label">频道</div>
-              <div class="channel-buttons">
-                <el-button-group>
-                  <el-button
-                    :disabled="!device.online || !device.status"
-                    @click="changeTvChannel(-1)"
+            <template v-if="device.metadata">
+              <div class="metadata-controls">
+                <h3 class="metadata-title">设备属性</h3>
+                <div class="metadata-properties">
+                  <div
+                    v-if="parsedMetadata && parsedMetadata.properties"
+                    class="property-list"
                   >
-                    上一个
-                  </el-button>
-                  <el-button type="primary">{{ tvChannel }}</el-button>
-                  <el-button
-                    :disabled="!device.online || !device.status"
-                    @click="changeTvChannel(1)"
-                  >
-                    下一个
-                  </el-button>
-                </el-button-group>
+                    <div
+                      v-for="prop in parsedMetadata.properties"
+                      :key="prop.id"
+                      class="property-item"
+                    >
+                      <span class="property-name">{{ prop.name }}</span>
+                      <div class="property-control">
+                        <el-input
+                          v-if="isNumberType(prop)"
+                          v-model="propertyValues[prop.id]"
+                          type="number"
+                        />
+                        <el-select
+                          v-else-if="isEnumType(prop)"
+                          v-model="propertyValues[prop.id]"
+                        >
+                          <el-option
+                            v-for="option in prop.valueType.elements"
+                            :key="option.value"
+                            :label="option.text"
+                            :value="option.value"
+                          />
+                        </el-select>
+                        <el-input v-else v-model="propertyValues[prop.id]" />
+                      </div>
+                    </div>
+                  </div>
+                  <div v-else class="no-properties">
+                    <el-alert
+                      title="无可控制的属性"
+                      type="info"
+                      :closable="false"
+                    />
+                  </div>
+                </div>
               </div>
-            </div>
+            </template>
 
-            <div class="control-item">
-              <div class="control-label">信号源</div>
-              <el-select
-                v-model="tvSource"
-                :disabled="!device.online || !device.status"
-                @change="updateTvSource"
-              >
-                <el-option label="HDMI 1" value="hdmi1" />
-                <el-option label="HDMI 2" value="hdmi2" />
-                <el-option label="HDMI 3" value="hdmi3" />
-                <el-option label="TV" value="tv" />
-              </el-select>
-            </div>
-          </div>
-
-          <div v-else class="default-controls">
-            <div class="control-item">
-              <div class="control-label">电源</div>
-              <el-switch
-                v-model="device.status"
-                :disabled="!device.online"
-                @change="updateDeviceStatus"
-              />
-            </div>
-            <div class="no-controls-message" v-if="device.online">
+            <div v-else class="no-controls-message">
               <el-alert
                 title="简单控制"
                 type="info"
@@ -272,26 +271,42 @@
           <el-input v-model="editForm.name" placeholder="请输入设备名称" />
         </el-form-item>
 
-        <el-form-item label="设备类型" prop="type">
-          <el-select v-model="editForm.type" placeholder="请选择设备类型">
-            <el-option
-              v-for="type in deviceTypes"
-              :key="type.id"
-              :label="type.name"
-              :value="type.id"
-            />
+        <el-form-item label="设备类型" prop="deviceType">
+          <el-select
+            v-model="editForm.deviceType"
+            placeholder="请选择设备类型"
+            disabled
+          >
+            <el-option label="直连设备" value="device" />
+            <el-option label="网关设备" value="gateway" />
+            <el-option label="网关子设备" value="childrenDevice" />
           </el-select>
         </el-form-item>
 
         <el-form-item label="设备ID" prop="id">
           <el-input disabled v-model="editForm.id" />
         </el-form-item>
+
+        <el-form-item
+          label="分类名称"
+          prop="classifiedName"
+          v-if="editForm.classifiedName !== undefined"
+        >
+          <el-input
+            v-model="editForm.classifiedName"
+            placeholder="请输入分类名称"
+          />
+        </el-form-item>
       </el-form>
 
       <template #footer>
         <div class="dialog-footer">
           <el-button @click="editDialogVisible = false">取消</el-button>
-          <el-button type="primary" @click="updateDevice" :loading="loading">
+          <el-button
+            type="primary"
+            @click="updateDevice"
+            :loading="editLoading"
+          >
             保存
           </el-button>
           <el-button
@@ -325,7 +340,6 @@ import {
   getDeviceDetail,
   toggleDevice as toggleDeviceApi,
   updateDeviceProperty,
-  getDeviceTypes,
 } from "@/api/device";
 
 const router = useRouter();
@@ -333,46 +347,69 @@ const route = useRoute();
 const deviceId = computed(() => route.params.deviceId);
 const activeTab = ref("info");
 
-// 设备类型定义
-const deviceTypes = ref([]);
+// 设备电源状态
+const devicePower = computed(() => {
+  return device.state.value === "online";
+});
+
+// 子设备数量（网关设备）
+const childDevicesCount = ref(0);
+
+// 设备属性值
+const propertyValues = reactive({});
 
 // 设备信息
 const device = reactive({
   id: deviceId.value,
   name: "",
-  type: "",
-  online: false,
-  status: false,
-  ip: "",
-  mac: "",
-  firmware: "",
-  addTime: null,
-  lastActive: null,
-  properties: {},
+  deviceType: {
+    text: "",
+    value: "",
+  },
+  state: {
+    text: "离线",
+    value: "offline",
+  },
+  photoUrl: "",
+  productId: "",
+  productName: "",
+  describe: "",
+  deriveMetadata: "",
+  creatorId: "",
+  creatorName: "",
+  createTime: null,
+  registryTime: null,
+  modifierId: "",
+  modifierName: "",
+  modifyTime: null,
+  features: [],
+});
+
+// 解析的元数据
+const parsedMetadata = computed(() => {
+  if (!device.deriveMetadata) return null;
+  try {
+    return JSON.parse(device.deriveMetadata);
+  } catch (e) {
+    console.error("解析元数据失败:", e);
+    return null;
+  }
 });
 
 // 灯光控制
 const lightBrightness = ref(80);
 const lightTemperature = ref(50);
-const lightColor = ref("#FFFFFF");
-
-// 空调控制
-const acTemperature = ref(24);
-const acMode = ref("cool");
-const acFanSpeed = ref("auto");
-
-// 电视控制
-const tvVolume = ref(30);
-const tvChannel = ref(1);
-const tvSource = ref("hdmi1");
 
 // 编辑对话框
 const editDialogVisible = ref(false);
-const editFormRef = ref(null);
+const deviceFormRef = ref(null);
 const editLoading = ref(false);
+const deleteLoading = ref(false);
 const editForm = reactive({
   name: "",
-  type: "",
+  deviceType: "",
+  id: "",
+  classifiedName: "",
 });
 
 // 表单验证规则
@@ -381,41 +418,57 @@ const deviceRules = {
     { required: true, message: "请输入设备名称", trigger: "blur" },
     { min: 2, max: 20, message: "长度在 2 到 20 个字符", trigger: "blur" },
   ],
-  type: [{ required: true, message: "请选择设备类型", trigger: "change" }],
+};
+
+// 判断属性类型
+const isNumberType = (prop) => {
+  if (!prop.valueType) return false;
+  return ["int", "float", "double"].includes(prop.valueType.type);
+};
+
+const isEnumType = (prop) => {
+  if (!prop.valueType) return false;
+  return (
+    prop.valueType.type === "enum" && Array.isArray(prop.valueType.elements)
+  );
 };
 
 // 格式化日期
-const formatDate = (date) => {
-  if (!date) return "N/A";
+const formatDate = (timestamp) => {
+  if (!timestamp) return "N/A";
 
-  const d = new Date(date);
+  const d = new Date(timestamp);
   const year = d.getFullYear();
   const month = String(d.getMonth() + 1).padStart(2, "0");
   const day = String(d.getDate()).padStart(2, "0");
   const hours = String(d.getHours()).padStart(2, "0");
   const minutes = String(d.getMinutes()).padStart(2, "0");
+  const seconds = String(d.getSeconds()).padStart(2, "0");
 
-  return `${year}-${month}-${day} ${hours}:${minutes}`;
+  return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+};
+
+// 格式化配置标签
+const formatConfigLabel = (key) => {
+  const labelMap = {
+    username: "用户名",
+    password: "密码",
+    secureId: "安全ID",
+    secureKey: "安全密钥",
+  };
+
+  return labelMap[key] || key;
 };
 
 // 根据设备类型获取图标
 const getDeviceIcon = (type) => {
   const iconMap = {
-    light: Lightning,
-    tv: Monitor,
-    ac: Cloudy,
-    fridge: Refrigerator,
-    camera: VideoCamera,
-    other: SetUp,
-    default: Cpu,
+    device: Lightning,
+    gateway: Monitor,
+    childrenDevice: Cpu,
+    default: SetUp,
   };
   return iconMap[type] || iconMap.default;
-};
-
-// 获取设备类型名称
-const getDeviceTypeName = (type) => {
-  const found = deviceTypes.value.find((item) => item.id === type);
-  return found ? found.name : "其他";
 };
 
 // 切换设备状态
@@ -423,23 +476,39 @@ const toggleDevice = async () => {
   try {
     const res = await toggleDeviceApi(device.id);
     if (res.status === 200) {
-      ElMessage.success(
-        res.message || `设备已${res.result.device.status ? "开启" : "关闭"}`
-      );
-      // 更新设备状态
-      device.status = res.result.device.status;
+      ElMessage.success(res.message || "操作成功");
     } else {
       ElMessage.error(res.message || "操作失败");
     }
   } catch (error) {
-    console.error("切换设备状态失败:", error);
+    console.error("操作设备失败:", error);
     ElMessage.error("操作失败，请稍后再试");
   }
 };
 
 // 更新设备状态
-const updateDeviceStatus = () => {
-  toggleDevice();
+const updateDeviceStatus = async () => {
+  try {
+    const res = await updateDeviceProperty(
+      device.id,
+      "power",
+      devicePower.value
+    );
+    if (res.status === 200) {
+      ElMessage.success(
+        `电源状态已更新为${devicePower.value ? "开启" : "关闭"}`
+      );
+    } else {
+      // 如果失败，恢复原状态
+      devicePower.value = !devicePower.value;
+      ElMessage.error(res.message || "更新失败");
+    }
+  } catch (error) {
+    // 如果出错，恢复原状态
+    devicePower.value = !devicePower.value;
+    console.error("更新设备属性失败:", error);
+    ElMessage.error("操作失败，请稍后再试");
+  }
 };
 
 // 灯光控制 - 更新亮度
@@ -476,104 +545,48 @@ const updateTemperature = async (value) => {
   }
 };
 
-// 灯光控制 - 更新颜色
-const updateColor = async (value) => {
-  try {
-    const res = await updateDeviceProperty(device.id, "color", value);
-    if (res.status === 200) {
-      ElMessage.success(`${device.name}颜色已更新`);
-    } else {
-      ElMessage.error(res.message || "更新失败");
+// 网关设备操作
+const refreshGateway = () => {
+  ElMessage.info("刷新网关");
+};
+
+const scanDevices = () => {
+  ElMessage.info("扫描设备");
+};
+
+const restartGateway = () => {
+  ElMessageBox.confirm(
+    "确定要重启网关设备吗？重启过程中所有连接设备将临时离线。",
+    "重启确认",
+    {
+      confirmButtonText: "确定",
+      cancelButtonText: "取消",
+      type: "warning",
     }
-  } catch (error) {
-    console.error("更新设备属性失败:", error);
-    ElMessage.error("操作失败，请稍后再试");
-  }
-};
-
-// 空调控制 - 更新温度
-const updateAcTemperature = (value) => {
-  // 模拟API调用
-  ElMessage.success(`空调温度已设置为${value}°C`);
-};
-
-// 空调控制 - 更新模式
-const updateAcMode = (value) => {
-  // 模拟API调用
-  const modeMap = {
-    cool: "制冷",
-    heat: "制热",
-    auto: "自动",
-    dry: "除湿",
-    fan: "送风",
-  };
-  ElMessage.success(`空调模式已切换为${modeMap[value]}`);
-};
-
-// 空调控制 - 更新风速
-const updateAcFanSpeed = (value) => {
-  // 模拟API调用
-  const speedMap = {
-    auto: "自动",
-    low: "低速",
-    medium: "中速",
-    high: "高速",
-  };
-  ElMessage.success(`空调风速已设置为${speedMap[value]}`);
-};
-
-// 电视控制 - 更新音量
-const updateTvVolume = (value) => {
-  // 模拟API调用
-  ElMessage.success(`电视音量已设置为${value}`);
-};
-
-// 电视控制 - 切换频道
-const changeTvChannel = (step) => {
-  tvChannel.value = Math.max(1, tvChannel.value + step);
-  // 模拟API调用
-  ElMessage.success(`已切换到频道${tvChannel.value}`);
-};
-
-// 电视控制 - 切换信号源
-const updateTvSource = (value) => {
-  // 模拟API调用
-  const sourceMap = {
-    hdmi1: "HDMI 1",
-    hdmi2: "HDMI 2",
-    hdmi3: "HDMI 3",
-    tv: "TV",
-  };
-  ElMessage.success(`已切换到信号源${sourceMap[value]}`);
-};
-
-// 摄像头控制
-const controlCamera = (action) => {
-  // 模拟API调用
-  const actionMap = {
-    up: "上",
-    down: "下",
-    left: "左",
-    right: "右",
-    zoomIn: "放大",
-    zoomOut: "缩小",
-  };
-  ElMessage.success(`摄像头${actionMap[action]}`);
+  )
+    .then(() => {
+      ElMessage.success("网关重启指令已发送");
+    })
+    .catch(() => {
+      ElMessage.info("已取消重启");
+    });
 };
 
 // 显示编辑对话框
 const showEditDialog = () => {
   editForm.name = device.name;
-  editForm.type = device.type;
+  editForm.deviceType = device.deviceType?.value || "";
+  editForm.id = device.id;
+  editForm.classifiedName = device.classifiedName;
   editDialogVisible.value = true;
 };
 
 // 更新设备信息
-const updateDeviceInfo = async () => {
-  if (!editFormRef.value) return;
+const updateDevice = async () => {
+  if (!deviceFormRef.value) return;
 
   try {
-    await editFormRef.value.validate();
+    await deviceFormRef.value.validate();
 
     editLoading.value = true;
 
@@ -581,7 +594,7 @@ const updateDeviceInfo = async () => {
     setTimeout(() => {
       // 更新设备信息
       device.name = editForm.name;
-      device.type = editForm.type;
+      device.classifiedName = editForm.classifiedName;
 
       ElMessage.success("设备信息更新成功");
       editDialogVisible.value = false;
@@ -593,39 +606,68 @@ const updateDeviceInfo = async () => {
   }
 };
 
-// 加载设备类型列表
-const loadDeviceTypes = async () => {
-  try {
-    const res = await getDeviceTypes();
-    if (res.status === 200 && res.result.types) {
-      deviceTypes.value = res.result.types;
+// 确认删除
+const confirmDelete = () => {
+  ElMessageBox.confirm(
+    `确定要删除设备 "${device.name}" 吗？此操作不可恢复！`,
+    "删除确认",
+    {
+      confirmButtonText: "确定删除",
+      cancelButtonText: "取消",
+      type: "danger",
     }
-  } catch (error) {
-    console.error("加载设备类型失败:", error);
-  }
+  )
+    .then(() => {
+      deleteLoading.value = true;
+      // 模拟删除操作
+      setTimeout(() => {
+        ElMessage.success("设备已删除");
+        deleteLoading.value = false;
+        router.push("/devices");
+      }, 1000);
+    })
+    .catch(() => {
+      ElMessage.info("已取消删除");
+    });
 };
 
 // 加载设备详情
 const loadDeviceDetail = async () => {
   try {
     const res = await getDeviceDetail(deviceId.value);
-    if (res.status === 200 && res.result.device) {
-      const deviceData = res.result.device;
+    if (res.status === 200 && res.result) {
+      const deviceData = res.result;
       Object.assign(device, deviceData);
 
-      // 初始化控制界面相关的状态
-      if (device.type === "light" && device.properties) {
-        lightBrightness.value = device.properties.brightness || 80;
-        lightTemperature.value = device.properties.colorTemperature || 50;
-        lightColor.value = device.properties.color || "#FFFFFF";
-      } else if (device.type === "ac" && device.properties) {
-        acTemperature.value = device.properties.temperature || 24;
-        acMode.value = device.properties.mode || "cool";
-        acFanSpeed.value = device.properties.fanSpeed || "auto";
-      } else if (device.type === "tv" && device.properties) {
-        tvVolume.value = device.properties.volume || 30;
-        tvChannel.value = device.properties.channel || 1;
-        tvSource.value = device.properties.source || "hdmi1";
+      // 设置电源状态
+      devicePower.value = device.state.value === "online";
+
+      // 如果是网关设备，设置子设备计数
+      if (device.deviceType?.value === "gateway") {
+        // 假设有API可以获取子设备数量
+        childDevicesCount.value = 3; // 示例值
+      }
+
+      // 如果有元数据，解析属性值
+      if (parsedMetadata.value && parsedMetadata.value.properties) {
+        parsedMetadata.value.properties.forEach((prop) => {
+          // 设置默认属性值
+          if (
+            prop.valueType &&
+            prop.valueType.type === "enum" &&
+            prop.valueType.elements?.length > 0
+          ) {
+            propertyValues[prop.id] = prop.valueType.elements[0].value;
+          } else if (
+            ["int", "float", "double"].includes(prop.valueType?.type)
+          ) {
+            propertyValues[prop.id] = 0;
+          } else if (prop.valueType?.type === "boolean") {
+            propertyValues[prop.id] = prop.valueType.falseValue || false;
+          } else {
+            propertyValues[prop.id] = "";
+          }
+        });
       }
     }
   } catch (error) {
@@ -636,8 +678,6 @@ const loadDeviceDetail = async () => {
 
 // 页面加载时获取设备信息
 onMounted(() => {
-  // 加载设备类型和设备详情
-  loadDeviceTypes();
   loadDeviceDetail();
 });
 </script>
@@ -701,6 +741,13 @@ onMounted(() => {
   background-color: #f5f7fa;
   border-radius: 50%;
   margin-right: 30px;
+  overflow: hidden;
+}
+
+.device-photo {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .info-actions {
@@ -730,46 +777,47 @@ onMounted(() => {
   color: #606266;
 }
 
-.camera-preview {
-  position: relative;
-  margin-top: 20px;
-}
-
-.preview-img {
-  width: 100%;
-  border-radius: 8px;
-  display: block;
-}
-
-.camera-controls-overlay {
-  position: absolute;
-  bottom: 20px;
-  left: 50%;
-  transform: translateX(-50%);
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  align-items: center;
-}
-
-.camera-offline {
-  height: 200px;
+.device-offline-control {
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: #f5f7fa;
-  border-radius: 8px;
-  color: #909399;
+  height: 300px;
+}
+
+.metadata-controls {
   margin-top: 20px;
 }
 
-.no-specific-controls {
+.metadata-title {
+  font-size: 16px;
+  margin-bottom: 15px;
+  color: #606266;
+}
+
+.property-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 20px;
+}
+
+.property-item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.property-name {
+  font-weight: 500;
+  color: #606266;
+}
+
+.no-properties,
+.no-controls-message {
   margin-top: 20px;
-  padding: 40px 0;
-  text-align: center;
-  background-color: #f5f7fa;
-  border-radius: 8px;
-  color: #909399;
+}
+
+.child-devices-count {
+  font-size: 16px;
 }
 
 @media (max-width: 768px) {
@@ -784,6 +832,10 @@ onMounted(() => {
 
   .device-icon {
     margin-right: 0;
+  }
+
+  .property-list {
+    grid-template-columns: 1fr;
   }
 }
 </style>

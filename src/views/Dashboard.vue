@@ -476,28 +476,28 @@ const loadDeviceList = async () => {
 };
 
 // 获取用户详情
-const fetchUserDetail = async () => {
-  try {
-    console.log("正在调用 /user/detail API...");
-    const res = await getUserDetail();
-    console.log("用户详情API返回结果:", res);
+// const fetchUserDetail = async () => {
+//   try {
+//     console.log("正在调用 /user/detail API...");
+//     const res = await getUserDetail();
+//     console.log("用户详情API返回结果:", res);
 
-    // 如果API调用成功，打印详细信息
-    if (res.status === 200) {
-      console.log("用户详情数据:", res.result || res.data);
-    } else {
-      console.error("获取用户详情失败:", res.message || "未知错误");
-    }
-  } catch (error) {
-    console.error("调用用户详情API出错:", error);
+//     // 如果API调用成功，打印详细信息
+//     if (res.status === 200) {
+//       console.log("用户详情数据:", res.result || res.data);
+//     } else {
+//       console.error("获取用户详情失败:", res.message || "未知错误");
+//     }
+//   } catch (error) {
+//     console.error("调用用户详情API出错:", error);
 
-    // 打印更详细的错误信息
-    if (error.response) {
-      console.error("错误状态码:", error.response.status);
-      console.error("错误数据:", error.response.data);
-    }
-  }
-};
+//     // 打印更详细的错误信息
+//     if (error.response) {
+//       console.error("错误状态码:", error.response.status);
+//       console.error("错误数据:", error.response.data);
+//     }
+//   }
+// };
 
 // 监听窗口大小变化
 const resizeHandler = () => {
@@ -516,7 +516,7 @@ onMounted(() => {
   loadUserInfo();
 
   // 调用用户详情API
-  fetchUserDetail();
+  // fetchUserDetail();
 
   // 加载设备统计和设备列表
   loadDeviceStats();

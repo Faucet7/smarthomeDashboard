@@ -11,24 +11,6 @@ export function register(data) {
   return post("/user/register", data);
 }
 
-// 备选注册路径1
-export function registerAlt1(data) {
-  // 尝试PUT方法
-  return put("/user/register", data);
-}
-
-// 备选注册路径2
-export function registerAlt2(data) {
-  // 尝试不同的URL格式
-  return post("/api/user/register", data);
-}
-
-// 备选注册路径3
-export function registerAlt3(data) {
-  // 尝试去掉前导斜杠
-  return post("user/register", data);
-}
-
 // 获取用户信息
 export function getUserInfo() {
   return get("/user/info");
