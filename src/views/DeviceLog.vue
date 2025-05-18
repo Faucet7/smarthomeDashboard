@@ -21,6 +21,7 @@
         <el-option label="警告" value="warning" />
         <el-option label="错误" value="error" />
         <el-option label="状态变化" value="status" />
+        <el-option label="属性上报" value="reportProperty" />
       </el-select>
 
       <el-date-picker
@@ -129,6 +130,7 @@ const logTypeOptions = [
   { text: "警告", value: "warning" },
   { text: "错误", value: "error" },
   { text: "状态变化", value: "status" },
+  { text: "属性上报", value: "reportProperty" },
 ];
 
 // 日志数据
@@ -182,11 +184,17 @@ const formatTimestamp = (row) => {
 
 // 获取日志类型名称
 const getLogTypeName = (type) => {
+  // 支持两种格式：字符串或对象
+  if (typeof type === "object" && type !== null) {
+    return type.text || "未知";
+  }
+
   const typeMap = {
     info: "信息",
     warning: "警告",
     error: "错误",
     status: "状态变化",
+    reportProperty: "属性上报",
   };
   return typeMap[type] || type;
 };
@@ -204,6 +212,9 @@ const getTagType = (type) => {
 
 // 过滤日志类型
 const filterLogType = (value, row) => {
+  if (typeof row.type === "object" && row.type !== null) {
+    return row.type.value === value;
+  }
   return row.type === value;
 };
 
@@ -235,12 +246,14 @@ const loadLogs = async () => {
         dateRange.value && dateRange.value.length > 1
           ? dateRange.value[1]
           : null,
+      pageIndex: currentPage.value - 1, // API需要从0开始的页码
+      pageSize: pageSize.value,
     };
 
     const res = await getDeviceLogs(deviceId.value, filters);
 
     if (res.status === 200) {
-      allLogs.value = res.result.logs || [];
+      allLogs.value = res.result.data || [];
       totalLogs.value = res.result.total || allLogs.value.length;
       ElMessage.success("日志加载成功");
     } else {
@@ -251,8 +264,6 @@ const loadLogs = async () => {
     ElMessage.error("加载日志失败，请稍后再试");
   } finally {
     loading.value = false;
-    // 重置到第一页
-    currentPage.value = 1;
   }
 };
 
@@ -265,11 +276,13 @@ const exportLogs = () => {
 const handleSizeChange = (val) => {
   pageSize.value = val;
   currentPage.value = 1;
+  loadLogs(); // 分页大小变化时重新加载数据
 };
 
 // 处理页码变化
 const handleCurrentChange = (val) => {
   currentPage.value = val;
+  loadLogs(); // 页码变化时重新加载数据
 };
 
 // 初始化加载

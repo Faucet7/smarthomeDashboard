@@ -118,7 +118,11 @@
         </el-card>
       </el-tab-pane>
 
-      <el-tab-pane label="控制面板" name="control">
+      <el-tab-pane
+        label="控制面板"
+        name="control"
+        @click="getDeviceControlItems()"
+      >
         <el-card class="control-card">
           <template #header>
             <div class="card-header">
@@ -133,127 +137,56 @@
             <el-empty description="设备当前离线，无法控制" />
           </div>
 
-          <div
-            v-else-if="device.deviceType?.value === 'childrenDevice'"
-            class="light-controls"
-          >
-            <div class="control-item">
-              <div class="control-label">电源</div>
-              <el-switch v-model="devicePower" @change="updateDeviceStatus" />
-            </div>
-
-            <div class="control-item">
-              <div class="control-label">亮度</div>
-              <el-slider
-                v-model="lightBrightness"
-                :disabled="!devicePower"
-                @change="updateBrightness"
-              />
-            </div>
-
-            <div class="control-item">
-              <div class="control-label">色温</div>
-              <el-slider
-                v-model="lightTemperature"
-                :disabled="!devicePower"
-                @change="updateTemperature"
-              />
-            </div>
-          </div>
-
-          <div
-            v-else-if="device.deviceType?.value === 'gateway'"
-            class="gateway-controls"
-          >
-            <div class="control-item">
-              <div class="control-label">网关状态</div>
-              <el-tag type="success">已连接</el-tag>
-            </div>
-
-            <div class="control-item">
-              <div class="control-label">子设备数量</div>
-              <el-badge
-                :value="childDevicesCount"
-                class="child-devices-count"
-              />
-            </div>
-
-            <div class="control-item">
-              <div class="control-label">操作</div>
-              <el-button-group>
-                <el-button @click="refreshGateway">刷新</el-button>
-                <el-button type="primary" @click="scanDevices"
-                  >扫描设备</el-button
-                >
-                <el-button type="warning" @click="restartGateway"
-                  >重启网关</el-button
-                >
-              </el-button-group>
-            </div>
-          </div>
-
-          <div v-else class="device-controls">
-            <div class="control-item">
-              <div class="control-label">电源</div>
-              <el-switch v-model="devicePower" @change="updateDeviceStatus" />
-            </div>
-
-            <template v-if="device.metadata">
-              <div class="metadata-controls">
-                <h3 class="metadata-title">设备属性</h3>
-                <div class="metadata-properties">
-                  <div
-                    v-if="parsedMetadata && parsedMetadata.properties"
-                    class="property-list"
-                  >
+          <div v-else class="property-cards">
+            <el-row :gutter="20">
+              <el-col
+                :xs="24"
+                :sm="12"
+                :md="8"
+                :lg="6"
+                v-for="(item, index) in deviceProperties"
+                :key="index"
+              >
+                <el-card class="property-card" shadow="hover">
+                  <template #header>
+                    <div class="property-card-header">
+                      <span>{{ item.propertyName }}</span>
+                      <el-button
+                        v-if="
+                          item.type === 'enum' ||
+                          item.type === 'int' ||
+                          item.type === 'float'
+                        "
+                        type="primary"
+                        link
+                        @click="showPropertyEditDialog(item)"
+                      >
+                        <el-icon><Edit /></el-icon>
+                      </el-button>
+                    </div>
+                  </template>
+                  <div class="property-card-content">
+                    <div v-if="item.type === 'enum'" class="property-value">
+                      <el-tag
+                        :type="getPropertyTagType(item.property, item.value)"
+                      >
+                        {{ item.formatValue }}
+                      </el-tag>
+                    </div>
                     <div
-                      v-for="prop in parsedMetadata.properties"
-                      :key="prop.id"
-                      class="property-item"
+                      v-else-if="item.type === 'float' || item.type === 'int'"
+                      class="property-value"
                     >
-                      <span class="property-name">{{ prop.name }}</span>
-                      <div class="property-control">
-                        <el-input
-                          v-if="isNumberType(prop)"
-                          v-model="propertyValues[prop.id]"
-                          type="number"
-                        />
-                        <el-select
-                          v-else-if="isEnumType(prop)"
-                          v-model="propertyValues[prop.id]"
-                        >
-                          <el-option
-                            v-for="option in prop.valueType.elements"
-                            :key="option.value"
-                            :label="option.text"
-                            :value="option.value"
-                          />
-                        </el-select>
-                        <el-input v-else v-model="propertyValues[prop.id]" />
-                      </div>
+                      <span class="number-value">{{ item.numberValue }}</span>
+                      <span class="unit">{{ item.unit }}</span>
+                    </div>
+                    <div v-else class="property-value">
+                      {{ item.formatValue }}
                     </div>
                   </div>
-                  <div v-else class="no-properties">
-                    <el-alert
-                      title="无可控制的属性"
-                      type="info"
-                      :closable="false"
-                    />
-                  </div>
-                </div>
-              </div>
-            </template>
-
-            <div v-else class="no-controls-message">
-              <el-alert
-                title="简单控制"
-                type="info"
-                :closable="false"
-                show-icon
-              >
-                此设备仅支持电源控制，无其他可配置项
-              </el-alert>
-            </div>
+                </el-card>
+              </el-col>
+            </el-row>
           </div>
         </el-card>
       </el-tab-pane>
@@ -319,6 +252,56 @@
         </div>
       </template>
     </el-dialog>
+
+    <!-- 编辑属性对话框 -->
+    <el-dialog
+      v-model="editPropertyDialogVisible"
+      :title="`编辑${currentProperty?.propertyName || ''}`"
+      width="400px"
+    >
+      <el-form :model="editPropertyForm" label-width="80px">
+        <el-form-item :label="currentProperty?.propertyName || '值'">
+          <el-select
+            v-if="currentProperty?.type === 'enum'"
+            v-model="editPropertyForm.value"
+            placeholder="请选择"
+          >
+            <el-option
+              v-for="option in getEnumOptions(currentProperty)"
+              :key="option.value"
+              :label="option.label"
+              :value="option.value"
+            />
+          </el-select>
+          <el-input-number
+            v-else-if="currentProperty?.type === 'int'"
+            v-model="editPropertyForm.value"
+            :min="0"
+            :max="100"
+          />
+          <el-input-number
+            v-else-if="currentProperty?.type === 'float'"
+            v-model="editPropertyForm.value"
+            :precision="1"
+            :step="0.1"
+            :min="0"
+            :max="100"
+          />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="editPropertyDialogVisible = false">取消</el-button>
+          <el-button
+            type="primary"
+            @click="handlePropertyUpdate"
+            :loading="updating"
+          >
+            确定
+          </el-button>
+        </div>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -335,11 +318,13 @@ import {
   VideoCamera,
   Lightning,
   SetUp,
+  Edit,
 } from "@element-plus/icons-vue";
 import {
   getDeviceDetail,
   toggleDevice as toggleDeviceApi,
-  updateDeviceProperty,
+  updateDevicePropertyApi,
+  getDeviceProperties,
 } from "@/api/device";
 
 const router = useRouter();
@@ -358,6 +343,9 @@ const childDevicesCount = ref(0);
 // 设备属性值
 const propertyValues = reactive({});
 
+// 设备属性数据
+const deviceProperties = ref([]);
+
 // 设备信息
 const device = reactive({
   id: deviceId.value,
@@ -370,6 +358,7 @@ const device = reactive({
     text: "离线",
     value: "offline",
   },
+  properties: [],
   photoUrl: "",
   productId: "",
   productName: "",
@@ -486,90 +475,12 @@ const toggleDevice = async () => {
   }
 };
 
-// 更新设备状态
-const updateDeviceStatus = async () => {
-  try {
-    const res = await updateDeviceProperty(
-      device.id,
-      "power",
-      devicePower.value
-    );
-    if (res.status === 200) {
-      ElMessage.success(
-        `电源状态已更新为${devicePower.value ? "开启" : "关闭"}`
-      );
-    } else {
-      // 如果失败，恢复原状态
-      devicePower.value = !devicePower.value;
-      ElMessage.error(res.message || "更新失败");
-    }
-  } catch (error) {
-    // 如果出错，恢复原状态
-    devicePower.value = !devicePower.value;
-    console.error("更新设备属性失败:", error);
-    ElMessage.error("操作失败，请稍后再试");
-  }
-};
-
-// 灯光控制 - 更新亮度
-const updateBrightness = async (value) => {
-  try {
-    const res = await updateDeviceProperty(device.id, "brightness", value);
-    if (res.status === 200) {
-      ElMessage.success(`${device.name}亮度已设置为${value}%`);
-    } else {
-      ElMessage.error(res.message || "更新失败");
-    }
-  } catch (error) {
-    console.error("更新设备属性失败:", error);
-    ElMessage.error("操作失败，请稍后再试");
-  }
-};
-
-// 灯光控制 - 更新色温
-const updateTemperature = async (value) => {
-  try {
-    const res = await updateDeviceProperty(
-      device.id,
-      "colorTemperature",
-      value
-    );
-    if (res.status === 200) {
-      ElMessage.success(`${device.name}色温已设置为${value}%`);
-    } else {
-      ElMessage.error(res.message || "更新失败");
-    }
-  } catch (error) {
-    console.error("更新设备属性失败:", error);
-    ElMessage.error("操作失败，请稍后再试");
-  }
-};
-
-// 网关设备操作
-const refreshGateway = () => {
-  ElMessage.info("刷新网关");
-};
-
-const scanDevices = () => {
-  ElMessage.info("扫描设备");
-};
-
-const restartGateway = () => {
-  ElMessageBox.confirm(
-    "确定要重启网关设备吗？重启过程中所有连接设备将临时离线。",
-    "重启确认",
-    {
-      confirmButtonText: "确定",
-      cancelButtonText: "取消",
-      type: "warning",
-    }
-  )
-    .then(() => {
-      ElMessage.success("网关重启指令已发送");
-    })
-    .catch(() => {
-      ElMessage.info("已取消重启");
-    });
+// 更新设备属性
+const updateDeviceProperty = async (property, value) => {
+  const res = await updateDevicePropertyApi(deviceId.value, {
+    property: property,
+    value: value,
+  });
 };
 
 // 显示编辑对话框
@@ -644,30 +555,48 @@ const loadDeviceDetail = async () => {
 
       // 如果是网关设备，设置子设备计数
       if (device.deviceType?.value === "gateway") {
-        // 假设有API可以获取子设备数量
         childDevicesCount.value = 3; // 示例值
       }
 
-      // 如果有元数据，解析属性值
-      if (parsedMetadata.value && parsedMetadata.value.properties) {
-        parsedMetadata.value.properties.forEach((prop) => {
-          // 设置默认属性值
-          if (
-            prop.valueType &&
-            prop.valueType.type === "enum" &&
-            prop.valueType.elements?.length > 0
-          ) {
-            propertyValues[prop.id] = prop.valueType.elements[0].value;
-          } else if (
-            ["int", "float", "double"].includes(prop.valueType?.type)
-          ) {
-            propertyValues[prop.id] = 0;
-          } else if (prop.valueType?.type === "boolean") {
-            propertyValues[prop.id] = prop.valueType.falseValue || false;
-          } else {
-            propertyValues[prop.id] = "";
+      // 解析metadata中的属性
+      if (deviceData.metadata) {
+        try {
+          const metadata = JSON.parse(deviceData.metadata);
+          if (metadata.properties) {
+            // 将properties保存到device对象中
+            device.properties = metadata.properties;
+
+            // 初始化每个属性的默认值
+            metadata.properties.forEach((prop) => {
+              if (prop.valueType) {
+                switch (prop.valueType.type) {
+                  case "enum":
+                    // 对于枚举类型，使用第一个选项作为默认值
+                    if (prop.valueType.elements?.length > 0) {
+                      propertyValues[prop.id] =
+                        prop.valueType.elements[0].value;
+                    }
+                    break;
+                  case "int":
+                  case "float":
+                  case "double":
+                    // 对于数值类型，初始化为0
+                    propertyValues[prop.id] = 0;
+                    break;
+                  case "boolean":
+                    // 对于布尔类型，初始化为false
+                    propertyValues[prop.id] = false;
+                    break;
+                  default:
+                    // 其他类型初始化为空字符串
+                    propertyValues[prop.id] = "";
+                }
+              }
+            });
           }
-        });
+        } catch (e) {
+          console.error("解析metadata失败:", e);
+        }
       }
     }
   } catch (error) {
@@ -676,9 +605,116 @@ const loadDeviceDetail = async () => {
   }
 };
 
+// 获取属性标签类型
+const getPropertyTagType = (property, value) => {
+  // 根据属性和值返回不同的标签类型
+  if (property === "power_on") {
+    return value === "true" ? "success" : "info";
+  }
+  if (property === "system_mode") {
+    return value === "off" ? "info" : "success";
+  }
+  if (property === "child_lock") {
+    return value === "LOCK" ? "danger" : "success";
+  }
+  if (property === "fan_mode") {
+    return "warning";
+  }
+  return "";
+};
+
+// 获取设备控制项目
+const getDeviceControlItems = async () => {
+  try {
+    // 获取设备属性ID列表
+    const properties = device.properties.map((item) => item.id);
+
+    const res = await getDeviceProperties(deviceId.value, properties);
+    if (res.status === 200 && res.result) {
+      // 更新设备属性数据
+      deviceProperties.value = res.result.data || [];
+    }
+  } catch (error) {
+    console.error("获取设备属性失败:", error);
+    ElMessage.error("获取设备属性失败，请稍后再试");
+  }
+};
+
+// 编辑属性相关
+const editPropertyDialogVisible = ref(false);
+const currentProperty = ref(null);
+const editPropertyForm = reactive({
+  value: null,
+});
+const updating = ref(false);
+
+// 显示编辑对话框
+const showPropertyEditDialog = (property) => {
+  currentProperty.value = property;
+  editPropertyForm.value = property.value;
+  editPropertyDialogVisible.value = true;
+};
+
+// 获取枚举类型的选项
+const getEnumOptions = (property) => {
+  if (!property) return [];
+
+  // 根据属性类型返回不同的选项
+  switch (property.property) {
+    case "power_on":
+      return [
+        { value: "true", label: "开" },
+        { value: "false", label: "关" },
+      ];
+    case "fan_mode":
+      return [
+        { value: "low", label: "低" },
+        { value: "medium", label: "中" },
+        { value: "high", label: "高" },
+      ];
+    case "system_mode":
+      return [
+        { value: "off", label: "关闭" },
+        { value: "heat", label: "制热" },
+        { value: "cool", label: "制冷" },
+      ];
+    case "child_lock":
+      return [
+        { value: "LOCK", label: "锁定" },
+        { value: "UNLOCK", label: "解锁" },
+      ];
+    default:
+      return [];
+  }
+};
+
+// 处理属性更新
+const handlePropertyUpdate = async () => {
+  if (!currentProperty.value) return;
+
+  try {
+    updating.value = true;
+    await updateDeviceProperty(
+      currentProperty.value.property,
+      editPropertyForm.value
+    );
+
+    // 更新成功后刷新属性列表
+    await getDeviceControlItems();
+    ElMessage.success("属性更新成功");
+    editPropertyDialogVisible.value = false;
+  } catch (error) {
+    console.error("更新属性失败:", error);
+    ElMessage.error("更新属性失败，请稍后再试");
+  } finally {
+    updating.value = false;
+  }
+};
+
 // 页面加载时获取设备信息
-onMounted(() => {
-  loadDeviceDetail();
+onMounted(async () => {
+  await loadDeviceDetail();
+  await getDeviceControlItems();
 });
 </script>
 
@@ -820,6 +856,58 @@ onMounted(() => {
   font-size: 16px;
 }
 
+.property-cards {
+  margin-top: 20px;
+}
+
+.property-card {
+  margin-bottom: 20px;
+  transition: all 0.3s;
+}
+
+.property-card:hover {
+  transform: translateY(-5px);
+}
+
+.property-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: 500;
+  color: #606266;
+}
+
+.property-card-header .el-button {
+  padding: 2px;
+}
+
+.property-card-header .el-icon {
+  font-size: 16px;
+}
+
+.property-card-content {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 60px;
+}
+
+.property-value {
+  text-align: center;
+}
+
+.number-value {
+  font-size: 24px;
+  font-weight: 500;
+  color: #303133;
+}
+
+.unit {
+  margin-left: 4px;
+  color: #909399;
+  font-size: 14px;
+}
+
 @media (max-width: 768px) {
   .device-info-header {
     flex-direction: column;
@@ -836,6 +924,14 @@ onMounted(() => {
 
   .property-list {
     grid-template-columns: 1fr;
+  }
+
+  .property-cards {
+    margin-top: 10px;
+  }
+
+  .property-card {
+    margin-bottom: 10px;
   }
 }
 </style>

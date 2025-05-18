@@ -19,7 +19,7 @@ service.interceptors.request.use(
       // 在请求头中添加token
       config.headers["x-access-token"] = token;
       // 记录日志用于调试
-      console.log("请求携带token:", token);
+      // console.log("请求携带token:", token);
     }
     return config;
   },
@@ -50,30 +50,30 @@ service.interceptors.response.use(
     }
   },
   (error) => {
-    // 添加详细的错误日志
-    console.error("请求失败:", error);
+    // // 添加详细的错误日志
+    // console.error("请求失败:", error);
 
-    if (error.response) {
-      // 服务器返回了错误状态码
-      console.error("错误状态码:", error.response.status);
-      console.error("错误数据:", error.response.data);
+    // if (error.response) {
+    //   // 服务器返回了错误状态码
+    //   console.error("错误状态码:", error.response.status);
+    //   console.error("错误数据:", error.response.data);
 
-      // 对特定状态码进行处理
-      if (error.response.status === 405) {
-        console.error("方法不允许，请检查API接口是否正确");
-      } else if (error.response.status === 401) {
-        console.error("未授权，可能是token已过期");
-        // 可以在这里处理token过期的情况
-        // ElMessage.error("登录已过期，请重新登录");
-        // router.push("/login");
-      }
-    } else if (error.request) {
-      // 请求已发出，但没有收到响应
-      console.error("未收到响应:", error.request);
-    } else {
-      // 请求配置出错
-      console.error("请求配置错误:", error.message);
-    }
+    //   // 对特定状态码进行处理
+    //   if (error.response.status === 405) {
+    //     console.error("方法不允许，请检查API接口是否正确");
+    //   } else if (error.response.status === 401) {
+    //     console.error("未授权，可能是token已过期");
+    //     // 可以在这里处理token过期的情况
+    //     // ElMessage.error("登录已过期，请重新登录");
+    //     // router.push("/login");
+    //   }
+    // } else if (error.request) {
+    //   // 请求已发出，但没有收到响应
+    //   console.error("未收到响应:", error.request);
+    // } else {
+    //   // 请求配置出错
+    //   console.error("请求配置错误:", error.message);
+    // }
 
     return Promise.reject(error);
   }

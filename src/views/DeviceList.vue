@@ -277,11 +277,17 @@ const getDeviceIcon = (type) => {
 
 // 切换设备状态（启用/禁用）
 const toggleDeviceState = async (device) => {
+  console.log(device);
+  //如果设备离线，则不可启用
+  if (device.state.value === "offline") {
+    ElMessage.error("设备离线，无法启用");
+    return;
+  }
   try {
-    const productId = device.productId || device.id;
+    const productId = device.id;
     let res;
 
-    if (device.state.value === "offline") {
+    if (device.state.value === "notActive") {
       // 如果当前是禁用状态，调用部署接口启用设备
       res = await deployDevice(productId);
     } else {

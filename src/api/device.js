@@ -1,4 +1,4 @@
-import { get, post } from "@/utils/request";
+import { get, post, put } from "@/utils/request";
 
 // 获取设备列表
 export function getDeviceList(params) {
@@ -34,14 +34,28 @@ export function getDeviceStats() {
   return get("/device/stats");
 }
 
+//获取设备属性
+export function getDeviceProperties(deviceId, property) {
+  return get(`/device/instance/${deviceId}/property/${property}/_query`);
+}
+
 // 获取设备详情
 export function getDeviceDetail(deviceId) {
-  return get(`/device/instance/${deviceId}`);
+  return get(`/device/instance/${deviceId}/detail`);
 }
 
 // 获取设备日志
-export function getDeviceLogs(deviceId, filters = {}) {
-  return get(`/device/logs/${deviceId}`, filters);
+export function getDeviceLogs(deviceId, filter = {}) {
+  const defaultFilter = {
+    pageIndex: 0,
+    pageSize: 10,
+    sorts: [{ name: "createTime", order: "desc" }],
+    terms: [],
+  };
+  return post(`/device/instance/${deviceId}/logs`, {
+    ...defaultFilter,
+    ...filter,
+  });
 }
 
 // 切换设备状态（开关）
@@ -50,8 +64,8 @@ export function toggleDevice(deviceId) {
 }
 
 // 更新设备属性（如亮度、温度等）
-export function updateDeviceProperty(deviceId, property, value) {
-  return post("/device/update", { deviceId, property, value });
+export function updateDevicePropertyApi(deviceId, data) {
+  return put(`/device/instance/${deviceId}/property`, data);
 }
 
 // 获取设备类型列表
