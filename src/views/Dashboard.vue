@@ -39,10 +39,6 @@
             <el-icon><Monitor /></el-icon>
             <span>设备管理</span>
           </el-menu-item>
-          <el-menu-item index="/home">
-            <el-icon><House /></el-icon>
-            <span>家庭信息</span>
-          </el-menu-item>
           <el-menu-item index="/user">
             <el-icon><User /></el-icon>
             <span>用户中心</span>
@@ -71,101 +67,101 @@
             </transition>
           </router-view>
           <template v-else>
-            <div class="welcome-section">
-              <div class="welcome-header">
-                <h2>欢迎回来，{{ userData.username || "用户" }}</h2>
+            <div style="display: flex; flex-direction: row; width: 100%">
+              <div class="welcome-section">
+                <div class="welcome-header">
+                  <h2>欢迎回来，{{ userData.username || "用户" }}</h2>
+                </div>
+                <p>{{ getGreeting() }}</p>
               </div>
-              <p>{{ getGreeting() }}</p>
+              <el-card class="stat-card">
+                <template #header>
+                  <div class="card-header">
+                    <div class="card-title">
+                      <el-icon><Monitor /></el-icon>
+                      <span>设备概览</span>
+                    </div>
+                  </div>
+                </template>
+                <div class="stat-content">
+                  <div class="stat-item">
+                    <div class="stat-value">{{ deviceStats.total }}</div>
+                    <div class="stat-label">总设备</div>
+                  </div>
+                  <div class="stat-item">
+                    <div class="stat-value online">
+                      {{ deviceStats.online }}
+                    </div>
+                    <div class="stat-label">在线</div>
+                  </div>
+                  <div class="stat-item">
+                    <div class="stat-value offline">
+                      {{ deviceStats.offline }}
+                    </div>
+                    <div class="stat-label">离线</div>
+                  </div>
+                </div>
+              </el-card>
             </div>
 
-            <el-row :gutter="20">
-              <el-col :xs="24" :sm="12" :md="6">
-                <el-card class="home-summary">
-                  <template #header>
-                    <div class="card-header">
-                      <div class="card-title">
-                        <el-icon><House /></el-icon>
-                        <span>家庭信息</span>
+            <div class="dashboard-row">
+              <el-row :gutter="24" class="dashboard-cards-row">
+                <el-col :xs="24" :sm="12">
+                  <el-card class="dashboard-card temperature-card">
+                    <template #header>
+                      <div class="card-header">
+                        <div class="card-title">
+                          <el-icon><Sunny /></el-icon>
+                          <span>室内温度</span>
+                        </div>
+                        <div class="chart-value">
+                          {{
+                            temperatureData.length
+                              ? temperatureData[temperatureData.length - 1]
+                                  .value + "°C"
+                              : "--"
+                          }}
+                        </div>
                       </div>
-                      <el-button text @click="$router.push('/home')">
-                        <el-icon><ArrowRight /></el-icon>
-                      </el-button>
+                    </template>
+                    <div class="chart-content">
+                      <v-chart
+                        v-if="temperatureOption && temperatureOption.series"
+                        :option="temperatureOption"
+                        style="height: 250px; width: 100%"
+                      />
                     </div>
-                  </template>
-                  <div class="home-info">
-                    <el-icon size="36px"><House /></el-icon>
-                    <div class="info-details">
-                      <h3>{{ homeData.name || "我的家" }}</h3>
-                      <p>ID: {{ homeData.id || "N/A" }}</p>
-                    </div>
-                  </div>
-                </el-card>
-              </el-col>
-
-              <el-col :xs="24" :sm="12" :md="6">
-                <el-card class="device-summary">
-                  <template #header>
-                    <div class="card-header">
-                      <div class="card-title">
-                        <el-icon><Monitor /></el-icon>
-                        <span>设备概览</span>
+                  </el-card>
+                </el-col>
+                <el-col :xs="24" :sm="12">
+                  <el-card class="dashboard-card humidity-card">
+                    <template #header>
+                      <div class="card-header">
+                        <div class="card-title">
+                          <el-icon><Cloudy /></el-icon>
+                          <span>室内湿度</span>
+                        </div>
+                        <div class="chart-value">
+                          {{
+                            humidityData.length
+                              ? humidityData[humidityData.length - 1].value +
+                                "%"
+                              : "--"
+                          }}
+                        </div>
                       </div>
-                      <el-button text @click="$router.push('/devices')">
-                        <el-icon><ArrowRight /></el-icon>
-                      </el-button>
+                    </template>
+                    <div class="chart-content">
+                      <v-chart
+                        v-if="humidityOption && humidityOption.series"
+                        :option="humidityOption"
+                        style="height: 250px; width: 100%"
+                      />
                     </div>
-                  </template>
-                  <div class="device-stats">
-                    <div class="stat">
-                      <div class="stat-value">{{ deviceStats.total }}</div>
-                      <div class="stat-label">总设备</div>
-                    </div>
-                    <div class="stat">
-                      <div class="stat-value">{{ deviceStats.online }}</div>
-                      <div class="stat-label">在线</div>
-                    </div>
-                    <div class="stat">
-                      <div class="stat-value">{{ deviceStats.offline }}</div>
-                      <div class="stat-label">离线</div>
-                    </div>
-                  </div>
-                </el-card>
-              </el-col>
-
-              <el-col :xs="24" :sm="12" :md="6">
-                <el-card class="temperature-card">
-                  <template #header>
-                    <div class="card-header">
-                      <div class="card-title">
-                        <el-icon><Sunny /></el-icon>
-                        <span>室内温度</span>
-                      </div>
-                    </div>
-                  </template>
-                  <div class="temp-display">
-                    <el-icon size="36px"><Sunny /></el-icon>
-                    <div class="temp-value">24°C</div>
-                  </div>
-                </el-card>
-              </el-col>
-
-              <el-col :xs="24" :sm="12" :md="6">
-                <el-card class="humidity-card">
-                  <template #header>
-                    <div class="card-header">
-                      <div class="card-title">
-                        <el-icon><Cloudy /></el-icon>
-                        <span>室内湿度</span>
-                      </div>
-                    </div>
-                  </template>
-                  <div class="temp-display">
-                    <el-icon size="36px"><Cloudy /></el-icon>
-                    <div class="temp-value">58%</div>
-                  </div>
-                </el-card>
-              </el-col>
-            </el-row>
+                  </el-card>
+                </el-col>
+              </el-row>
+            </div>
 
             <h3 class="section-title">
               <el-icon><Connection /></el-icon>
@@ -249,8 +245,10 @@ import {
   getDeviceStats,
   getDeviceList,
   toggleDevice as toggleDeviceApi,
+  getDeviceProperties,
 } from "@/api/device";
-import { getHomeInfo } from "@/api/home";
+import VChart from "vue-echarts";
+import * as echarts from "echarts";
 
 // 路由实例
 const router = useRouter();
@@ -286,7 +284,6 @@ const pageTitle = computed(() => {
   const routeMap = {
     "/": "控制面板",
     "/devices": "设备管理",
-    "/home": "家庭信息",
     "/user": "用户中心",
   };
 
@@ -315,14 +312,6 @@ const userData = reactive({
   identity: "",
 });
 
-// 家庭数据
-const homeData = reactive({
-  id: "",
-  name: "我的智能家",
-  createdAt: "",
-  updatedAt: "",
-});
-
 // 设备统计
 const deviceStats = reactive({
   total: 0,
@@ -332,6 +321,162 @@ const deviceStats = reactive({
 
 // 常用设备列表 - 默认为空，通过API获取数据
 const frequentDevices = ref([]);
+
+// 温湿度图表相关
+const temperatureData = ref([]);
+const humidityData = ref([]);
+const temperatureOption = ref({});
+const humidityOption = ref({});
+
+// 示例设备ID
+const temperatureDeviceId = "front_temperature";
+const humidityDeviceId = "front_humidity";
+
+// 格式化时间戳为HH:mm
+function formatTime(ts) {
+  if (!ts) return "";
+  const d = new Date(Number(ts));
+  const h = String(d.getHours()).padStart(2, "0");
+  const m = String(d.getMinutes()).padStart(2, "0");
+  return `${h}:${m}`;
+}
+
+// 获取温度历史数据并渲染图表
+const fetchTemperatureData = async () => {
+  try {
+    const res = await getDeviceProperties(temperatureDeviceId, "value");
+    if (res.status === 200 && res.result && Array.isArray(res.result.data)) {
+      // 按时间升序排列，取最近25条
+      const sorted = [...res.result.data].sort(
+        (a, b) => (a.timestamp || a.createTime) - (b.timestamp || b.createTime)
+      );
+      const recent = sorted.slice(-25);
+      temperatureData.value = recent.map((item) => ({
+        time: formatTime(item.timestamp || item.createTime),
+        value: item.value,
+      }));
+      temperatureOption.value = {
+        tooltip: { trigger: "axis" },
+        xAxis: {
+          type: "category",
+          data: temperatureData.value.map((d) => d.time),
+          axisLabel: {
+            color: "#222",
+            fontSize: 16,
+            fontWeight: 600,
+            rotate: 45,
+            interval: 1,
+            hideOverlap: false,
+          },
+          axisLine: { lineStyle: { color: "#409eff", width: 2 } },
+        },
+        yAxis: {
+          type: "value",
+          axisLabel: {
+            color: "#222",
+            fontSize: 16,
+            fontWeight: 600,
+            rotate: 45,
+          },
+          name: "°C",
+          nameTextStyle: { fontSize: 18, color: "#409eff", fontWeight: 700 },
+          splitLine: { lineStyle: { color: "#eee", type: "dashed" } },
+        },
+        series: [
+          {
+            data: temperatureData.value.map((d) => d.value),
+            type: "line",
+            smooth: true,
+            symbol: "circle",
+            symbolSize: 10,
+            lineStyle: { color: "#ff9900", width: 4 },
+            itemStyle: {
+              color: "#ff9900",
+              borderWidth: 2,
+              borderColor: "#fff",
+            },
+            areaStyle: { color: "rgba(255,153,0,0.10)" },
+          },
+        ],
+        grid: { left: 30, right: 20, top: 35, bottom: 50 },
+      };
+    }
+  } catch (e) {
+    temperatureData.value = [];
+    temperatureOption.value = {};
+  }
+};
+
+// 获取湿度历史数据并渲染图表
+const fetchHumidityData = async () => {
+  try {
+    const res = await getDeviceProperties(humidityDeviceId, "value");
+    if (res.status === 200 && res.result && Array.isArray(res.result.data)) {
+      // 按时间升序排列，取最近25条
+      const sorted = [...res.result.data].sort(
+        (a, b) => (a.timestamp || a.createTime) - (b.timestamp || b.createTime)
+      );
+      const recent = sorted.slice(-25);
+      humidityData.value = recent.map((item) => ({
+        time: formatTime(item.timestamp || item.createTime),
+        value: item.value,
+      }));
+      humidityOption.value = {
+        tooltip: { trigger: "axis" },
+        xAxis: {
+          type: "category",
+          data: humidityData.value.map((d) => d.time),
+          axisLabel: {
+            color: "#222",
+            fontSize: 16,
+            fontWeight: 600,
+            rotate: 45,
+            interval: 1,
+            hideOverlap: false,
+          },
+          axisLine: { lineStyle: { color: "#409eff", width: 2 } },
+        },
+        yAxis: {
+          type: "value",
+          axisLabel: {
+            color: "#222",
+            fontSize: 16,
+            fontWeight: 600,
+            rotate: 30,
+          },
+          name: "%",
+          nameTextStyle: {
+            fontSize: 18,
+            color: "#409eff",
+            fontWeight: 700,
+            top: "100%",
+          },
+          splitLine: { lineStyle: { color: "#eee", type: "dashed" } },
+        },
+        series: [
+          {
+            data: humidityData.value.map((d) => d.value),
+            type: "line",
+            smooth: true,
+            symbol: "circle",
+            symbolSize: 10,
+            lineStyle: { color: "#409eff", width: 4 },
+            itemStyle: {
+              color: "#409eff",
+              borderWidth: 2,
+              borderColor: "#fff",
+            },
+            areaStyle: { color: "rgba(64,158,255,0.10)" },
+          },
+        ],
+        grid: { left: 30, right: 20, top: 35, bottom: 50 },
+      };
+    }
+  } catch (e) {
+    humidityData.value = [];
+    humidityOption.value = {};
+  }
+};
 
 // 根据时间获取问候语
 const getGreeting = () => {
@@ -413,37 +558,25 @@ const loadUserInfo = () => {
     userData.homeId = parsedInfo.homeId || "";
     userData.identity = parsedInfo.type?.name || parsedInfo.identity || "用户";
 
-    // 更新家庭信息
-    homeData.id = parsedInfo.homeId || "";
-
-    // 加载家庭详细信息
-    loadHomeInfo();
-  }
-};
-
-// 加载家庭信息
-const loadHomeInfo = async () => {
-  try {
-    const res = await getHomeInfo();
-    if (res.status === 200 && res.result.home) {
-      homeData.name = res.result.home.name;
-      homeData.id = res.result.home.id;
-      homeData.createdAt = res.result.home.createdAt;
-      homeData.updatedAt = res.result.home.updatedAt;
-    }
-  } catch (error) {
-    console.error("加载家庭信息失败:", error);
+    // 加载设备统计和设备列表
+    loadDeviceStats();
+    loadDeviceList();
   }
 };
 
 // 加载设备统计信息
 const loadDeviceStats = async () => {
   try {
-    const res = await getDeviceStats();
-    if (res.status === 200 && res.result.stats) {
-      deviceStats.total = res.result.stats.total;
-      deviceStats.online = res.result.stats.online;
-      deviceStats.offline = res.result.stats.offline;
+    const res = await getDeviceList();
+    if (res.status === 200 && res.result && Array.isArray(res.result.data)) {
+      const devices = res.result.data;
+      deviceStats.total = devices.length;
+      deviceStats.online = devices.filter(
+        (d) => d.state && d.state.value === "online"
+      ).length;
+      deviceStats.offline = devices.filter(
+        (d) => d.state && d.state.value === "offline"
+      ).length;
     }
   } catch (error) {
     console.error("加载设备统计信息失败:", error);
@@ -475,30 +608,6 @@ const loadDeviceList = async () => {
   }
 };
 
-// 获取用户详情
-// const fetchUserDetail = async () => {
-//   try {
-//     console.log("正在调用 /user/detail API...");
-//     const res = await getUserDetail();
-//     console.log("用户详情API返回结果:", res);
-
-//     // 如果API调用成功，打印详细信息
-//     if (res.status === 200) {
-//       console.log("用户详情数据:", res.result || res.data);
-//     } else {
-//       console.error("获取用户详情失败:", res.message || "未知错误");
-//     }
-//   } catch (error) {
-//     console.error("调用用户详情API出错:", error);
-
-//     // 打印更详细的错误信息
-//     if (error.response) {
-//       console.error("错误状态码:", error.response.status);
-//       console.error("错误数据:", error.response.data);
-//     }
-//   }
-// };
-
 // 监听窗口大小变化
 const resizeHandler = () => {
   isMobile.value = window.innerWidth < 1200;
@@ -515,15 +624,11 @@ onMounted(() => {
   // 加载用户信息
   loadUserInfo();
 
-  // 调用用户详情API
-  // fetchUserDetail();
-
-  // 加载设备统计和设备列表
-  loadDeviceStats();
-  loadDeviceList();
-
   // 监听窗口大小变化，自动调整侧边栏状态
   window.addEventListener("resize", resizeHandler);
+
+  fetchTemperatureData();
+  fetchHumidityData();
 });
 
 onUnmounted(() => {
@@ -571,11 +676,13 @@ onUnmounted(() => {
 .sidebar {
   height: 100%;
   background-color: #ffffff;
-  position: relative;
+  position: fixed;
+  left: 0;
+  z-index: 10;
+  width: 0;
   overflow: hidden;
-  transition: width 0.3s ease, box-shadow 0.3s ease;
+  transition: all 0.3s ease;
   white-space: nowrap;
-  flex-shrink: 0;
 }
 
 .sidebar.sidebar-open {
@@ -601,11 +708,13 @@ onUnmounted(() => {
 .main-content {
   flex: 1;
   padding: 20px;
+  background: url("@/assets/image.png") no-repeat center center;
+  background-size: cover;
   overflow-y: auto;
   box-sizing: border-box;
-  transition: width 0.3s ease, padding 0.3s ease;
+  transition: width 0.3s ease, padding 0.3s ease, margin-left 0.3s;
   width: 100%;
-  min-height: calc(100vh - 56px); /* 减去顶部导航栏的高度 */
+  min-height: calc(100vh - 56px);
 }
 
 .drawer-header {
@@ -664,29 +773,23 @@ onUnmounted(() => {
   opacity: 0;
 }
 
+/* 侧边栏展开时，主内容区域缩小 */
 @media (min-width: 1200px) {
-  /* 大屏幕默认显示侧边栏 */
-  .sidebar.sidebar-open {
-    width: 250px;
-  }
-
-  /* 侧边栏打开时，主内容区域调整宽度 */
-  .main-content.sidebar-open {
+  .sidebar.sidebar-open ~ .main-content {
     width: calc(100% - 250px);
+    margin-left: 250px;
   }
 }
 
 @media (max-width: 1199px) {
-  /* 中小屏幕上，侧边栏为绝对定位 */
   .sidebar.sidebar-open {
     position: absolute;
     width: 240px;
     z-index: 15;
   }
-
-  /* 中小屏幕上，即使侧边栏打开，主内容区域也占据全宽 */
   .main-content.sidebar-open {
     width: 100%;
+    margin-left: 0;
   }
 }
 
@@ -700,7 +803,7 @@ onUnmounted(() => {
   }
 
   .welcome-section h2 {
-    font-size: 20px;
+    font-size: 40px;
   }
 
   .welcome-section p {
@@ -741,15 +844,21 @@ onUnmounted(() => {
 
 .welcome-section {
   margin-bottom: 30px;
-  background-color: #fff;
+  background-color: rgba(255, 255, 255, 0.7);
+  margin: 10px 12px;
   padding: 20px;
+  width: 70%;
   border-radius: 8px;
   box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.05);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  transition: all 0.3s;
 }
 
 .welcome-section h2 {
   margin: 0;
-  font-size: 24px;
+  font-size: 40px;
   font-weight: 600;
   color: #303133;
 }
@@ -757,14 +866,15 @@ onUnmounted(() => {
 .welcome-section p {
   margin: 8px 0 0;
   color: #606266;
-  font-size: 15px;
+  font-size: 20px;
 }
 
 /* 卡片样式优化 */
 :deep(.el-card) {
-  height: 100%;
+  height: max(fit-content, 350px);
   margin-bottom: 20px;
   border-radius: 8px;
+  background-color: rgba(255, 255, 255, 0.7);
   box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.05);
   transition: all 0.3s;
 }
@@ -789,20 +899,21 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 8px;
+  font-size: 20px;
+
   font-weight: 600;
 }
 
 .card-title .el-icon {
-  font-size: 18px;
+  margin-right: 10px;
+  font-size: 30px;
   color: #409eff;
 }
 
 /* 首行卡片高度统一 */
-.home-summary,
 .device-summary,
 .temperature-card,
 .humidity-card {
-  height: 100%;
   display: flex;
   flex-direction: column;
 }
@@ -818,38 +929,6 @@ onUnmounted(() => {
   margin-bottom: 20px;
   display: flex;
   flex-direction: column;
-}
-
-/* 家庭信息卡片 */
-.home-info {
-  display: flex;
-  align-items: center;
-  gap: 15px;
-  height: 100%;
-  padding: 10px 0;
-}
-
-.home-info .el-icon {
-  background-color: #f0f7ff;
-  padding: 10px;
-  border-radius: 50%;
-  color: #409eff;
-}
-
-.info-details {
-  flex: 1;
-}
-
-.info-details h3 {
-  margin: 0 0 5px;
-  font-size: 16px;
-  font-weight: 500;
-}
-
-.info-details p {
-  margin: 0;
-  color: #909399;
-  font-size: 13px;
 }
 
 /* 设备统计卡片 */
@@ -886,7 +965,6 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   gap: 15px;
-  height: 100%;
   padding: 10px 0;
 }
 
@@ -1055,15 +1133,115 @@ onUnmounted(() => {
 
 .welcome-header {
   display: flex;
+  font-weight: 600;
+  color: #303133;
+  font-size: 24px !important;
   align-items: center;
   gap: 10px;
 }
 
 .welcome-header .el-icon {
-  font-size: 28px;
+  font-size: 38px;
   color: #409eff;
   background-color: #ecf5ff;
   padding: 10px;
   border-radius: 50%;
+}
+
+.dashboard-row {
+  margin-bottom: 32px;
+}
+.dashboard-cards-row {
+  margin-bottom: 0;
+}
+.dashboard-card {
+  min-height: 220px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: stretch;
+  margin-bottom: 0;
+}
+.stat-card {
+  margin: 10px 12px;
+  width: 30%;
+}
+.stat-card .stat-content {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-around;
+  align-items: center;
+  height: 100%;
+  margin-top: 10px;
+  gap: 8px;
+}
+.stat-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+}
+.stat-value {
+  font-size: 32px;
+  font-weight: 700;
+  margin-bottom: 6px;
+  color: #409eff;
+}
+.stat-value.online {
+  color: #67c23a;
+}
+.stat-value.offline {
+  color: #f56c6c;
+}
+.stat-label {
+  font-size: 14px;
+  color: #909399;
+}
+.chart-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  height: fit-content;
+}
+.chart-content canvas {
+  padding: 10px;
+  height: 100%;
+}
+.chart-value {
+  font-size: 38px;
+  font-weight: 900;
+  color: #ff9900;
+  letter-spacing: 1px;
+  line-height: 20px;
+  text-shadow: 0 2px 8px rgba(255, 153, 0, 0.08);
+}
+.humidity-card .chart-value {
+  color: #409eff;
+  text-shadow: 0 2px 8px rgba(64, 158, 255, 0.08);
+}
+@media (max-width: 1200px) {
+  .dashboard-card {
+    min-height: 180px;
+  }
+  .stat-value,
+  .chart-value {
+    font-size: 22px;
+  }
+}
+@media (max-width: 768px) {
+  .dashboard-row {
+    margin-bottom: 16px;
+  }
+  .dashboard-card {
+    min-height: 120px;
+    margin-bottom: 16px;
+  }
+  .stat-content {
+    height: 80px;
+  }
+  /* .chart-content {
+    padding-top: 0;
+  } */
 }
 </style>

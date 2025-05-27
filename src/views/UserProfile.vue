@@ -12,7 +12,7 @@
           src="https://cube.elemecdn.com/3/7c/3ea6beec64369c2642b92c6726f1epng.png"
           class="avatar"
         />
-        <el-button type="primary" plain size="small" class="upload-btn"
+        <el-button type="primary" plain size="small" class="upload-btn" disabled
           >更换头像</el-button
         >
       </div>
@@ -33,10 +33,6 @@
           <el-input v-model="profileForm.id" disabled />
         </el-form-item>
 
-        <el-form-item label="家庭ID">
-          <el-input v-model="profileForm.homeId" disabled />
-        </el-form-item>
-
         <el-form-item label="角色">
           <el-input v-model="profileForm.identity" disabled />
         </el-form-item>
@@ -50,8 +46,10 @@
       </el-form>
 
       <div class="action-buttons" v-if="!isEditing">
-        <el-button type="primary" @click="startEdit">编辑信息</el-button>
-        <el-button type="warning" @click="showPasswordDialog"
+        <el-button type="primary" @click="startEdit" disabled
+          >编辑信息</el-button
+        >
+        <el-button type="warning" @click="showPasswordDialog" disabled
           >修改密码</el-button
         >
       </div>
@@ -118,10 +116,9 @@ import {
 // 用户信息表单
 const profileFormRef = ref(null);
 const profileForm = reactive({
-  id: "",
-  username: "",
-  homeId: "",
-  identity: "用户",
+  id: "admin",
+  username: "超级管理员",
+  identity: "超级管理员",
 });
 
 // 编辑状态管理

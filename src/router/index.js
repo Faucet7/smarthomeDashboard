@@ -6,7 +6,6 @@ const Login = () => import("@/views/Login.vue");
 const Register = () => import("@/views/Register.vue");
 const Dashboard = () => import("@/views/Dashboard.vue");
 const UserProfile = () => import("@/views/UserProfile.vue");
-const HomeInfo = () => import("@/views/HomeInfo.vue");
 const DeviceList = () => import("@/views/DeviceList.vue");
 const DeviceDetail = () => import("@/views/DeviceDetail.vue");
 const DeviceLog = () => import("@/views/DeviceLog.vue");
@@ -37,12 +36,6 @@ const router = createRouter({
           path: "/user",
           name: "UserProfile",
           component: UserProfile,
-          meta: { requiresAuth: true },
-        },
-        {
-          path: "/home",
-          name: "HomeInfo",
-          component: HomeInfo,
           meta: { requiresAuth: true },
         },
         {

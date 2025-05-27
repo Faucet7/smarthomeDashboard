@@ -41,14 +41,6 @@
           />
         </el-form-item>
 
-        <el-form-item prop="homeId">
-          <el-input
-            v-model="registerForm.homeId"
-            placeholder="家庭ID"
-            prefix-icon="House"
-          />
-        </el-form-item>
-
         <el-form-item>
           <el-button
             type="primary"
@@ -73,7 +65,7 @@
 import { reactive, ref } from "vue";
 import { useRouter } from "vue-router";
 import { ElMessage } from "element-plus";
-import { User, Lock, House } from "@element-plus/icons-vue";
+import { User, Lock } from "@element-plus/icons-vue";
 import { register, registerAlt1, registerAlt2, registerAlt3 } from "@/api/user";
 
 const router = useRouter();
@@ -84,7 +76,6 @@ const registerForm = reactive({
   username: "",
   password: "",
   confirmPassword: "",
-  homeId: "",
 });
 
 const validatePass = (rule, value, callback) => {
@@ -117,7 +108,6 @@ const rules = {
   confirmPassword: [
     { required: true, validator: validatePass2, trigger: "blur" },
   ],
-  homeId: [{ required: true, message: "请输入家庭ID", trigger: "blur" }],
 };
 
 const handleRegister = async () => {
@@ -133,7 +123,6 @@ const handleRegister = async () => {
       const registerData = {
         username: registerForm.username,
         password: registerForm.password,
-        homeId: registerForm.homeId,
       };
 
       // 备选数据格式1 - homeId 作为数字

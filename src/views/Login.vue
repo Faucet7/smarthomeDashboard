@@ -12,12 +12,14 @@
         ref="loginFormRef"
         :rules="rules"
         class="login-form"
+        @keyup.enter="handleLogin"
       >
         <el-form-item prop="username">
           <el-input
             v-model="loginForm.username"
             placeholder="用户名"
             prefix-icon="User"
+            @keyup.enter="handleLogin"
           />
         </el-form-item>
 
@@ -28,6 +30,7 @@
             placeholder="密码"
             prefix-icon="Lock"
             show-password
+            @keyup.enter="handleLogin"
           />
         </el-form-item>
 
@@ -41,11 +44,10 @@
             登录
           </el-button>
         </el-form-item>
-
-        <div class="form-footer">
+        <!-- <div class="form-footer">
           <span>没有账号？</span>
           <router-link to="/register">立即注册</router-link>
-        </div>
+        </div> -->
       </el-form>
     </div>
   </div>
@@ -133,68 +135,110 @@ const handleLogin = async () => {
 <style scoped>
 .login-container {
   height: 100vh;
-  width: 100%;
+  width: 100vw;
   display: flex;
   justify-content: center;
   align-items: center;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  padding: 20px;
+  background: url("@/assets/image.png") center center/cover no-repeat;
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
+  z-index: 0;
 }
 
 .login-card {
   width: 100%;
-  max-width: 400px;
-  background-color: #ffffff;
-  border-radius: 10px;
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
-  padding: 30px;
+  max-width: 480px;
+  min-width: 340px;
+  min-height: 420px;
+  padding: 48px 40px 36px 40px;
+  border-radius: 24px;
+  box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.18);
+  background: rgba(255, 255, 255, 0.18);
+  backdrop-filter: blur(18px) saturate(180%);
+  -webkit-backdrop-filter: blur(18px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
 .logo-header {
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-bottom: 20px;
 }
 
 h1 {
-  font-size: 24px;
-  color: #303133;
+  font-size: 28px;
+  color: #222;
   margin: 0;
+  letter-spacing: 2px;
+  font-weight: 700;
 }
 
 h2 {
-  font-size: 20px;
-  color: #606266;
+  font-size: 22px;
+  color: #333;
   text-align: center;
-  margin-bottom: 25px;
+  font-weight: 500;
 }
 
 .login-form {
   margin-top: 20px;
+  width: 100%;
+}
+
+.el-input {
+  height: 50px;
 }
 
 .login-button {
   width: 100%;
-  padding: 12px 0;
-  font-size: 16px;
+  padding: 14px 0;
+  font-size: 20px;
+  border-radius: 12px;
+  font-weight: 600;
+  height: 50px;
 }
 
 .form-footer {
-  margin-top: 15px;
+  margin-top: 18px;
   text-align: center;
-  font-size: 14px;
-  color: #606266;
+  font-size: 15px;
+  color: #222;
 }
 
 .form-footer a {
-  color: #409eff;
-  text-decoration: none;
+  color: #222;
+  text-decoration: underline;
   margin-left: 5px;
+}
+
+:deep(.el-input__wrapper) {
+  background: rgba(255, 255, 255, 0.5) !important;
+  border-radius: 12px !important;
+  box-shadow: none !important;
+  border: 1px solid rgba(255, 255, 255, 0.3) !important;
+}
+
+:deep(.el-input__inner) {
+  background: transparent !important;
+  color: #222 !important;
+  font-size: 16px;
+  box-shadow: none !important;
+}
+
+:deep(.el-form-item) {
+  margin-bottom: 24px;
+}
+
+@media (max-width: 600px) {
+  .login-card {
+    max-width: 98vw;
+    padding: 32px 10px 24px 10px;
+  }
 }
 </style>
